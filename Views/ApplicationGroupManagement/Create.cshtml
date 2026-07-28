@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "Create Application Group";
+}
+<form id="applicationGroupCreateForm" method="post">
+    <ui-page-section title="Create Application Group">
+        <ui-form-card title="Group Details">
+            <ui-form-content>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <ui-text-input name="Name" id="Name" required label="Group Name" type="text" placeholder="e.g. ACL Stack"></ui-text-input>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-6" style="float:right">
+                        <div class="d-flex gap-2 justify-content-end flex-wrap">
+                            <ui-button label="Back" type="button" id="btnCancel" class="btn-right"></ui-button>
+                            <ui-button label="Submit" type="button" id="btnSubmit" class="btn-right" data-bs-toggle="modal" data-bs-target="#submit-confirmation-modal"></ui-button>
+                        </div>
+                    </div>
+                </div>
+            </ui-form-content>
+        </ui-form-card>
+    </ui-page-section>
+</form>
+@await Html.PartialAsync("~/Views/Shared/_ConfirmationModal.cshtml", new tms_template_net8.Models.ViewModels.ConfirmationModalViewModel { ModalId = "submit-confirmation-modal", Message = "Are you sure you want to create this application group?", ConfirmButtonId = "btnConfirm" })
+@section Scripts {
+    <script>
+        window.applicationGroupManagementCreateConfig = { urls: { index: '@Url.Action("Index", "ApplicationGroupManagement")' } };
+    </script>
+    <script src="~/js/apiClient.js" asp-append-version="true"></script>
+    <script type="module" src="~/ApplicationGroupManagement/js/create.js" asp-append-version="true"></script>
+}

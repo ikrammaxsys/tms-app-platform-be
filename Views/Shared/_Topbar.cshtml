@@ -1,0 +1,142 @@
+@inject tms_template_net8.Auth.Services.IUserAccessControlService _aclSvc
+@{
+    string topBarUserName = "";
+    var aclData = _aclSvc.GetCurrent(Context);
+    if (aclData?.User != null)
+    {
+        topBarUserName = !string.IsNullOrWhiteSpace(aclData.User.EmpName)
+            ? aclData.User.EmpName.Trim()
+            : (aclData.User.UserId ?? "").Trim();
+    }
+
+    if (string.IsNullOrEmpty(topBarUserName))
+    {
+        topBarUserName = Context.Session.GetString("gstrUserName")?.Trim()
+            ?? Context.Session.GetString("gstrUserID")?.Trim()
+            ?? "";
+    }
+
+    string topBarUserInitials = "";
+    if (!string.IsNullOrWhiteSpace(topBarUserName))
+    {
+        var nameParts = topBarUserName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (nameParts.Length >= 2)
+        {
+            topBarUserInitials = $"{char.ToUpperInvariant(nameParts[0][0])}{char.ToUpperInvariant(nameParts[1][0])}";
+        }
+        else
+        {
+            var single = nameParts[0];
+            topBarUserInitials = single.Length >= 2
+                ? single.Substring(0, 2).ToUpperInvariant()
+                : single.ToUpperInvariant();
+        }
+    }
+
+    string topBarAvatarUrl = "";
+    if (!string.IsNullOrEmpty(topBarUserInitials))
+    {
+        var avatarSvg =
+            $"<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'>" +
+            $"<rect width='100%' height='100%' fill='#004098'/>" +
+            $"<text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' fill='#fff' " +
+            $"font-family='system-ui,sans-serif' font-size='24' font-weight='600'>{topBarUserInitials}</text></svg>";
+        topBarAvatarUrl = "data:image/svg+xml," + Uri.EscapeDataString(avatarSvg);
+    }
+}
+<script>
+(function () {
+    window.appConfig = window.appConfig || {};
+    window.appConfig.topbarUserName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(topBarUserName));
+    window.appConfig.topbarAvatarUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(topBarAvatarUrl));
+    window.appConfig.topbarLogoutUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Url.Action("LogoutPage", "ACLChecking") ?? string.Empty));
+    window.appConfig.topbarChangePasswordUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(string.Empty));
+})();
+</script>
+<style>
+    ui-topbar .app-topbar-user-divider {
+        display: flex;
+        align-items: center;
+        align-self: stretch;
+        padding: 0 0.25rem 0 0.5rem;
+    }
+
+    ui-topbar .ui-user-divider {
+        width: 1px;
+        height: 1.75rem;
+        margin: 0;
+        background-color: #e5e7eb;
+        flex-shrink: 0;
+    }
+</style>
+<ui-topbar style="width: 100%;">
+    <div slot="right" class="app-topbar-user-divider"><div class="ui-user-divider"></div></div>
+    <div slot="right">
+        <user-profile user-name="@topBarUserName" avatar-url="@topBarAvatarUrl">
+            <button slot="menu" class="dropdown-item ChangePassword-btn">Change Password</button>
+            <button slot="menu" class="dropdown-item logout-btn">Logout</button>
+        </user-profile>
+    </div>
+</ui-topbar>
+<script>
+(function () {
+    var c = window.appConfig || {};
+
+    function applyTopbarIdentity() {
+        var el = document.querySelector("ui-topbar");
+        if (!el) return;
+        el.setAttribute("user-name", c.topbarUserName != null ? c.topbarUserName : "");
+        el.setAttribute("avatar-url", c.topbarAvatarUrl || "");
+    }
+
+    applyTopbarIdentity();
+
+    function cfg() {
+        return {
+            logout: c.topbarLogoutUrl || "",
+            changePassword: c.topbarChangePasswordUrl || c.topbarChangeUserUrl || ""
+        };
+    }
+
+    /** Logout: full page. Change password: SPA via main-nav when available. */
+    function go(url, useSpa) {
+        if (!url) return;
+        if (useSpa && typeof window.spaNavigate === "function") {
+            window.spaNavigate(url);
+            return;
+        }
+        window.location.assign(url);
+    }
+
+    document.addEventListener(
+        "click",
+        function (e) {
+            var t = e.target;
+            if (!t || !t.closest) return;
+            var profile = t.closest("user-profile");
+            if (!profile) return;
+            var u = cfg();
+            if (t.closest(".logout-btn")) {
+                e.preventDefault();
+                e.stopPropagation();
+                go(u.logout);
+                return;
+            }
+            if (t.closest(".ChangePassword-btn")) {
+                e.preventDefault();
+                e.stopPropagation();
+                go(u.changePassword, true);
+                return;
+            }
+        },
+        true
+    );
+
+    document.addEventListener("ui:topbar:logoutClick", function () {
+        go(cfg().logout);
+    });
+    document.addEventListener("ui:topbar:settingsClick", function () {
+        go(cfg().changePassword, true);
+    });
+})();
+</script>

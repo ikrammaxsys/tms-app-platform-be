@@ -1,0 +1,59 @@
+@{
+    var id = ViewBag.Id as int? ?? 0;
+    ViewData["Title"] = "Edit Application";
+    var statusUrl = Url.Content("~/data/app-status-options.json");
+    var serverOptionsUrl = Url.Content("~/api/servers/options");
+    var groupOptionsUrl = Url.Content("~/api/application-groups/options");
+}
+<div id="editLoading" class="text-center py-5 text-muted">Loading...</div>
+<form id="applicationEditForm" method="post" style="display: none;">
+    <ui-page-section title="Edit Application">
+        <ui-form-card title="Application Details">
+            <ui-form-content>
+                <div class="row mt-2">
+                    <div class="col-6"><ui-text-input name="Name" id="Name" required label="Application Name" type="text" placeholder="e.g. Auth API"></ui-text-input></div>
+                    <div class="col-6"><ui-dropdown name="ApplicationGroupId" required id="ApplicationGroupId" label="Application Group" ui-source="@groupOptionsUrl" placeholder="Select group"></ui-dropdown></div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6"><ui-text-input name="Version" id="Version" required label="Version" type="text" placeholder="e.g. v3.2.0"></ui-text-input></div>
+                    <div class="col-6"><ui-text-input name="Commit" id="Commit" label="Commit" type="text" placeholder="e.g. tms0001"></ui-text-input></div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6"><ui-dropdown name="Status" required id="Status" label="Status" ui-source="@statusUrl" placeholder="Select status"></ui-dropdown></div>
+                    <div class="col-6"><ui-dropdown name="ServerId" required id="ServerId" label="Server" ui-source="@serverOptionsUrl" placeholder="Select server"></ui-dropdown></div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6"><ui-text-input name="AppUrl" id="AppUrl" label="App URL" type="text" placeholder="https://host/app"></ui-text-input></div>
+                    <div class="col-6"><ui-text-input name="RepositoryUrl" id="RepositoryUrl" label="Repository URL" type="text" placeholder="https://github.com/org/repo"></ui-text-input></div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6"><ui-text-input name="LastDeployment" id="LastDeployment" label="Last Deployment" type="text" placeholder="2026-07-20T09:00:00"></ui-text-input></div>
+                </div>
+                <div class="row">
+                    <div class="col-6"></div>
+                    <div class="col-6" style="float:right">
+                        <div class="d-flex gap-2 justify-content-end flex-wrap">
+                            <ui-button label="Back" type="button" id="btnCancel" class="btn-right"></ui-button>
+                            <ui-button label="Update" type="button" id="btnSubmit" class="btn-right" data-bs-toggle="modal" data-bs-target="#edit-confirmation-modal"></ui-button>
+                        </div>
+                    </div>
+                </div>
+            </ui-form-content>
+        </ui-form-card>
+    </ui-page-section>
+</form>
+<div id="editError" class="text-center py-5 text-danger" style="display: none;">Failed to load application.</div>
+@await Html.PartialAsync("~/Views/Shared/_ConfirmationModal.cshtml", new tms_template_net8.Models.ViewModels.ConfirmationModalViewModel { ModalId = "edit-confirmation-modal", Message = "Are you sure you want to update this application?", ConfirmButtonId = "btnConfirmUpdate" })
+@section Scripts {
+    <script>
+        window.applicationManagementEditConfig = {
+            applicationId: @id,
+            urls: {
+                index: '@Url.Action("Index", "ApplicationManagement")',
+                detail: '@Url.Action("Detail", "ApplicationManagement", new { id })'
+            }
+        };
+    </script>
+    <script src="~/js/apiClient.js" asp-append-version="true"></script>
+    <script type="module" src="~/ApplicationManagement/js/edit.js" asp-append-version="true"></script>
+}

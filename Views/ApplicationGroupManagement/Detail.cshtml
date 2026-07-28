@@ -1,0 +1,47 @@
+@{
+    var id = ViewBag.Id as int? ?? 0;
+    ViewData["Title"] = "Application Group Detail";
+}
+<div class="row g-0 px-3 tr-listing-header">
+    <div class="col-sm-6 align-self-center">
+        <p class="text-muted m-0 tr-listing-header-title">Application Group Detail</p>
+    </div>
+</div>
+<div style="border-top:1px solid #F0F0F0; margin-top:-1px" class="tr-btm-line"></div>
+<div class="page-container px-3 overflow-auto">
+    <div class="tr-btm-btn-margin">
+        <div id="detailLoading" class="text-center py-5 text-muted">Loading...</div>
+        <div id="detailContent" style="display: none;">
+            <div class="card mt-3 mb-2 card-height height-override">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h6 class="card-title text-muted m-0 p-0">Group Details</h6>
+                        <a id="btnEdit" href="#" class="btn btn-sm btn-primary">Edit</a>
+                    </div>
+                    <hr />
+                    <div class="row mt-2"><div class="col-sm-2"><p class="text-muted">ID <span style="float:right">:</span></p></div><div class="col-sm-4"><p class="m-0" id="detailId">-</p></div></div>
+                    <div class="row mt-2"><div class="col-sm-2"><p class="text-muted">Group Name <span style="float:right">:</span></p></div><div class="col-sm-4"><p class="m-0" id="detailName">-</p></div></div>
+                </div>
+            </div>
+            <div class="row row-cols-auto justify-content-between g-1 tr-btm-btn-area tr-btm-size" style="padding-right: 20px;">
+                <div><button id="btnDelete" type="button" class="btn btn-sm btn-danger mx-1" data-bs-toggle="modal" data-bs-target="#confirmation-modal">Delete</button></div>
+                <div class="col"><button id="btnBack" type="button" class="btn btn-sm btn-secondary mx-1">Back</button></div>
+            </div>
+        </div>
+        <div id="detailError" class="text-center py-5 text-danger" style="display: none;">Failed to load application group.</div>
+    </div>
+</div>
+@await Html.PartialAsync("~/Views/Shared/_ConfirmationModal.cshtml", new tms_template_net8.Models.ViewModels.ConfirmationModalViewModel { ModalId = "confirmation-modal", Message = "Are you sure to delete this application group?", ConfirmButtonId = "btnConfirmDelete", UseSmallButtons = false })
+@section Scripts {
+    <script>
+        window.applicationGroupManagementDetailConfig = {
+            groupId: @id,
+            urls: {
+                index: '@Url.Action("Index", "ApplicationGroupManagement")',
+                edit: '@Url.Action("Edit", "ApplicationGroupManagement", new { id })'
+            }
+        };
+    </script>
+    <script src="~/js/apiClient.js" asp-append-version="true"></script>
+    <script type="module" src="~/ApplicationGroupManagement/js/detail.js" asp-append-version="true"></script>
+}
