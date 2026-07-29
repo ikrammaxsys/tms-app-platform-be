@@ -27,6 +27,7 @@ public class ApplicationsController : ControllerBase
             .Select(x => new
             {
                 x.Id,
+                x.Uid,
                 x.Name,
                 x.Version,
                 x.Commit,
@@ -61,10 +62,17 @@ public class ApplicationsController : ControllerBase
             return BadRequest(ApiResponse<ApplicationItem>.FailureResponse("Server is required."));
         if (body.ApplicationGroupId <= 0)
             return BadRequest(ApiResponse<ApplicationItem>.FailureResponse("Application group is required."));
-        var created = await _applicationService.CreateAsync(body, cancellationToken);
-        if (created is null)
-            return BadRequest(ApiResponse<ApplicationItem>.FailureResponse("Server or application group not found."));
-        return Ok(ApiResponse<ApplicationItem>.SuccessResponse(created, "Application created successfully."));
+        try
+        {
+            var created = await _applicationService.CreateAsync(body, cancellationToken);
+            if (created is null)
+                return BadRequest(ApiResponse<ApplicationItem>.FailureResponse("Server or application group not found."));
+            return Ok(ApiResponse<ApplicationItem>.SuccessResponse(created, "Application created successfully."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<ApplicationItem>.FailureResponse(ex.Message));
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -74,13 +82,22 @@ public class ApplicationsController : ControllerBase
             return BadRequest(ApiResponse.FailureResponse("Application name is required."));
         if (string.IsNullOrWhiteSpace(body.Version))
             return BadRequest(ApiResponse.FailureResponse("Version is required."));
+        if (string.IsNullOrWhiteSpace(body.Uid))
+            return BadRequest(ApiResponse.FailureResponse("UID is required."));
         if (body.ServerId <= 0)
             return BadRequest(ApiResponse.FailureResponse("Server is required."));
         if (body.ApplicationGroupId <= 0)
             return BadRequest(ApiResponse.FailureResponse("Application group is required."));
-        if (!await _applicationService.UpdateAsync(id, body, cancellationToken))
-            return NotFound(ApiResponse.FailureResponse("Application, server, or group not found."));
-        return Ok(ApiResponse<bool>.SuccessResponse(true, "Application updated successfully."));
+        try
+        {
+            if (!await _applicationService.UpdateAsync(id, body, cancellationToken))
+                return NotFound(ApiResponse.FailureResponse("Application, server, or group not found."));
+            return Ok(ApiResponse<bool>.SuccessResponse(true, "Application updated successfully."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse.FailureResponse(ex.Message));
+        }
     }
 
     [HttpDelete("{id:int}")]

@@ -1,6 +1,7 @@
 namespace tms_template_net8.Models.DTOs.Application;
 public sealed class ApplicationUpsertRequest
 {
+    public string? Uid { get; set; }
     public string? Name { get; set; }
     public string? Version { get; set; }
     public string? Commit { get; set; }

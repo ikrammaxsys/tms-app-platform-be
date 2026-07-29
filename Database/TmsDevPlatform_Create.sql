@@ -51,6 +51,7 @@ GO
 CREATE TABLE dbo.Applications
 (
     id                      INT             NOT NULL IDENTITY(1,1),
+    uid                     NVARCHAR(64)    NOT NULL,
     name                    NVARCHAR(150)   NOT NULL,
     version                 NVARCHAR(50)    NOT NULL,
     commit_id               NVARCHAR(64)    NULL,
@@ -61,6 +62,7 @@ CREATE TABLE dbo.Applications
     id_server               INT             NOT NULL,
     id_application_group    INT             NOT NULL,
     CONSTRAINT PK_Applications PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT UQ_Applications_Uid UNIQUE (uid),
     CONSTRAINT FK_Applications_Server FOREIGN KEY (id_server)
         REFERENCES dbo.Servers (id),
     CONSTRAINT FK_Applications_Group FOREIGN KEY (id_application_group)
@@ -86,7 +88,7 @@ CREATE TABLE dbo.application_uptime_logs
     id_application      INT             NOT NULL,
     latency             INT             NULL,          -- milliseconds
     status              NVARCHAR(50)    NOT NULL,
-    [timestamp]         DATETIME2(0)    NOT NULL CONSTRAINT DF_Uptime_TS DEFAULT (SYSUTCDATETIME()),
+    [timestamp]         DATETIME2(0)    NOT NULL CONSTRAINT DF_Uptime_TS DEFAULT (DATEADD(HOUR, 8, SYSUTCDATETIME())),
     CONSTRAINT PK_application_uptime_logs PRIMARY KEY CLUSTERED (id),
     CONSTRAINT FK_Uptime_Application FOREIGN KEY (id_application)
         REFERENCES dbo.Applications (id),
@@ -138,20 +140,20 @@ SET IDENTITY_INSERT dbo.Servers OFF;
 GO
 SET IDENTITY_INSERT dbo.Applications ON;
 INSERT INTO dbo.Applications
-    (id, name, version, commit_id, status, last_deployment, app_url, repository_url, id_server, id_application_group)
+    (id, uid, name, version, commit_id, status, last_deployment, app_url, repository_url, id_server, id_application_group)
 VALUES
-    (1,  N'Auth API',          N'v3.2.0',     N'tms0001', N'Healthy', '2026-07-20T09:00:00', N'https://tms-eapp.webapp.toray/auth-api',          N'https://github.com/tms-dev-platform/auth-api',          2, 1),
-    (2,  N'DSP',               N'v5.1.0',     N'tms0002', N'Healthy', '2026-07-18T10:00:00', N'https://tms-eapp.webapp.toray/dsp',               N'https://github.com/tms-dev-platform/dsp',               2, 1),
-    (3,  N'UI Foundation',     N'v2.8.1',     N'tms0003', N'Healthy', '2026-07-15T11:00:00', N'https://tms-eapp.webapp.toray/UiFoundation',      N'https://github.com/tms-dev-platform/ui-foundation',     2, 1),
-    (4,  N'Core API',          N'v4.0.3',     N'tms0004', N'Warning', '2026-07-22T08:40:00', N'https://tms-eapp.webapp.toray/core-api',          N'https://github.com/tms-dev-platform/core-api',          2, 1),
-    (5,  N'IHRS',              N'v1.4.0',     N'tms0005', N'Healthy', '2026-06-01T08:00:00', N'http://10.188.9.124/ihrs',                        N'https://github.com/tms-dev-platform/ihrs',              1, 2),
-    (6,  N'Auth API',          N'v3.2.0',     N'tms0006', N'Healthy', '2026-07-21T15:00:00', N'https://tms-sales.webapp.toray/auth-api',         N'https://github.com/tms-dev-platform/auth-api',          4, 1),
-    (7,  N'Core API',          N'v4.0.1',     N'tms0009', N'Warning', '2026-07-23T09:00:00', N'https://tms-sales.webapp.toray/core-api',         N'https://github.com/tms-dev-platform/core-api',          4, 1),
-    (8,  N'TAS',               N'v2.1.0',     N'tms0010', N'Healthy', '2026-07-10T12:00:00', N'https://tms-sales.webapp.toray/tas',              N'https://github.com/tms-dev-platform/tas',               4, 3),
-    (9,  N'VCS',               N'v1.9.5',     N'tms0011', N'Healthy', '2026-07-12T13:00:00', N'https://tms-sales.webapp.toray/vcs',              N'https://github.com/tms-dev-platform/vcs',               4, 3),
-    (10, N'AWS Migration App', N'v0.9.0',     N'tms0012', N'Warning', '2026-07-24T07:00:00', N'http://10.188.9.146/migration',                   N'https://github.com/tms-dev-platform/aws-migration-app', 5, 4),
-    (11, N'Auth API',          N'v3.3.0-dev', N'tms0013', N'Healthy', '2026-07-26T16:00:00', N'http://10.230.8.170/auth-api',                    N'https://github.com/tms-dev-platform/auth-api',          7, 1),
-    (12, N'Core API',          N'v4.1.0-dev', N'tms0016', N'Warning', '2026-07-27T09:00:00', N'http://10.230.8.170/core-api',                    N'https://github.com/tms-dev-platform/core-api',          7, 1);
+    (1,  N'app-auth-api-eapp',       N'Auth API',          N'v3.2.0',     N'tms0001', N'Healthy', '2026-07-20T09:00:00', N'https://tms-eapp.webapp.toray/auth-api',          N'https://github.com/tms-dev-platform/auth-api',          2, 1),
+    (2,  N'app-dsp-eapp',            N'DSP',               N'v5.1.0',     N'tms0002', N'Healthy', '2026-07-18T10:00:00', N'https://tms-eapp.webapp.toray/dsp',               N'https://github.com/tms-dev-platform/dsp',               2, 1),
+    (3,  N'app-ui-foundation-eapp',  N'UI Foundation',     N'v2.8.1',     N'tms0003', N'Healthy', '2026-07-15T11:00:00', N'https://tms-eapp.webapp.toray/UiFoundation',      N'https://github.com/tms-dev-platform/ui-foundation',     2, 1),
+    (4,  N'app-core-api-eapp',       N'Core API',          N'v4.0.3',     N'tms0004', N'Warning', '2026-07-22T08:40:00', N'https://tms-eapp.webapp.toray/core-api',          N'https://github.com/tms-dev-platform/core-api',          2, 1),
+    (5,  N'app-ihrs',                N'IHRS',              N'v1.4.0',     N'tms0005', N'Healthy', '2026-06-01T08:00:00', N'http://10.188.9.124/ihrs',                        N'https://github.com/tms-dev-platform/ihrs',              1, 2),
+    (6,  N'app-auth-api-sales',      N'Auth API',          N'v3.2.0',     N'tms0006', N'Healthy', '2026-07-21T15:00:00', N'https://tms-sales.webapp.toray/auth-api',         N'https://github.com/tms-dev-platform/auth-api',          4, 1),
+    (7,  N'app-core-api-sales',      N'Core API',          N'v4.0.1',     N'tms0009', N'Warning', '2026-07-23T09:00:00', N'https://tms-sales.webapp.toray/core-api',         N'https://github.com/tms-dev-platform/core-api',          4, 1),
+    (8,  N'app-tas-sales',           N'TAS',               N'v2.1.0',     N'tms0010', N'Healthy', '2026-07-10T12:00:00', N'https://tms-sales.webapp.toray/tas',              N'https://github.com/tms-dev-platform/tas',               4, 3),
+    (9,  N'app-vcs-sales',           N'VCS',               N'v1.9.5',     N'tms0011', N'Healthy', '2026-07-12T13:00:00', N'https://tms-sales.webapp.toray/vcs',              N'https://github.com/tms-dev-platform/vcs',               4, 3),
+    (10, N'app-aws-migration',       N'AWS Migration App', N'v0.9.0',     N'tms0012', N'Warning', '2026-07-24T07:00:00', N'http://10.188.9.146/migration',                   N'https://github.com/tms-dev-platform/aws-migration-app', 5, 4),
+    (11, N'app-auth-api-dev',        N'Auth API',          N'v3.3.0-dev', N'tms0013', N'Healthy', '2026-07-26T16:00:00', N'http://10.230.8.170/auth-api',                    N'https://github.com/tms-dev-platform/auth-api',          7, 1),
+    (12, N'app-core-api-dev',        N'Core API',          N'v4.1.0-dev', N'tms0016', N'Warning', '2026-07-27T09:00:00', N'http://10.230.8.170/core-api',                    N'https://github.com/tms-dev-platform/core-api',          7, 1);
 SET IDENTITY_INSERT dbo.Applications OFF;
 GO
 /* Seed ~30 days of daily uptime samples for each application */

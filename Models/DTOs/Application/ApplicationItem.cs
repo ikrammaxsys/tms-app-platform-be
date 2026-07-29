@@ -2,6 +2,7 @@ namespace tms_template_net8.Models.DTOs.Application;
 public sealed class ApplicationItem
 {
     public int Id { get; set; }
+    public string Uid { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string Commit { get; set; } = string.Empty;

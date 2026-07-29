@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
 using TMS.WebApp.Sdk.Data.Sql;
+using tms_template_net8.Common.Time;
 using tms_template_net8.Models.DTOs.Application;
 namespace tms_template_net8.Data.Repositories;
 public sealed class ApplicationRepository : IApplicationRepository
@@ -9,6 +10,7 @@ public sealed class ApplicationRepository : IApplicationRepository
     private const string SelectSql = """
         SELECT
             a.id AS Id,
+            a.uid AS Uid,
             a.name AS Name,
             a.version AS Version,
             a.commit_id AS [Commit],
@@ -45,22 +47,48 @@ public sealed class ApplicationRepository : IApplicationRepository
         return await _sql.QuerySingleAsync<ApplicationItem>(sql, CommandType.Text, new { Id = id }, null, cancellationToken);
     }
 
+    public async Task<ApplicationItem?> GetByUidAsync(string uid, CancellationToken cancellationToken = default)
+    {
+        var sql = SelectSql + " WHERE a.uid = @Uid;";
+        return await _sql.QuerySingleAsync<ApplicationItem>(sql, CommandType.Text, new { Uid = uid }, null, cancellationToken);
+    }
+
+    public async Task<bool> UidExistsAsync(string uid, int? excludeId = null, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT CAST(CASE WHEN EXISTS (
+                SELECT 1 FROM dbo.Applications
+                WHERE uid = @Uid
+                  AND (@ExcludeId IS NULL OR id <> @ExcludeId)
+            ) THEN 1 ELSE 0 END AS bit);
+            """;
+        return await _sql.QuerySingleAsync<bool>(
+            sql,
+            CommandType.Text,
+            new { Uid = uid, ExcludeId = excludeId },
+            null,
+            cancellationToken);
+    }
+
     public async Task<ApplicationItem> AddAsync(ApplicationItem application, CancellationToken cancellationToken = default)
     {
         const string sql = """
             INSERT INTO dbo.Applications
-                (name, version, commit_id, status, last_deployment, app_url, repository_url, id_server, id_application_group)
+                (uid, name, version, commit_id, status, last_deployment, app_url, repository_url, id_server, id_application_group)
             OUTPUT INSERTED.id AS Id
             VALUES
-                (@Name, @Version, @Commit, @Status, @LastDeployment, @AppUrl, @RepositoryUrl, @ServerId, @ApplicationGroupId);
+                (@Uid, @Name, @Version, @Commit, @Status, @LastDeployment, @AppUrl, @RepositoryUrl, @ServerId, @ApplicationGroupId);
             """;
         var inserted = await _sql.QuerySingleAsync<ApplicationItem>(sql, CommandType.Text, new
         {
+            application.Uid,
             application.Name,
             application.Version,
             application.Commit,
             application.Status,
-            application.LastDeployment,
+            LastDeployment = application.LastDeployment.HasValue
+                ? MalaysiaTime.ForStorage(application.LastDeployment)
+                : (DateTime?)null,
             application.AppUrl,
             application.RepositoryUrl,
             application.ServerId,
@@ -77,6 +105,7 @@ public sealed class ApplicationRepository : IApplicationRepository
         const string sql = """
             UPDATE dbo.Applications
             SET
+                uid = @Uid,
                 name = @Name,
                 version = @Version,
                 commit_id = @Commit,
@@ -93,11 +122,14 @@ public sealed class ApplicationRepository : IApplicationRepository
             CommandType.Text,
             [
                 new SqlParameter("@Id", id),
+                new SqlParameter("@Uid", application.Uid),
                 new SqlParameter("@Name", application.Name),
                 new SqlParameter("@Version", application.Version),
                 new SqlParameter("@Commit", (object?)application.Commit ?? DBNull.Value),
                 new SqlParameter("@Status", application.Status),
-                new SqlParameter("@LastDeployment", (object?)application.LastDeployment ?? DBNull.Value),
+                new SqlParameter("@LastDeployment", application.LastDeployment.HasValue
+                    ? MalaysiaTime.ForStorage(application.LastDeployment)
+                    : DBNull.Value),
                 new SqlParameter("@AppUrl", (object?)application.AppUrl ?? DBNull.Value),
                 new SqlParameter("@RepositoryUrl", (object?)application.RepositoryUrl ?? DBNull.Value),
                 new SqlParameter("@ServerId", application.ServerId),
@@ -130,7 +162,7 @@ public sealed class ApplicationRepository : IApplicationRepository
                 new SqlParameter("@Id", id),
                 new SqlParameter("@Version", version),
                 new SqlParameter("@Commit", (object?)commit ?? DBNull.Value),
-                new SqlParameter("@LastDeployment", (object?)lastDeployment ?? DBNull.Value)
+                new SqlParameter("@LastDeployment", MalaysiaTime.ForStorage(lastDeployment))
             ],
             null,
             cancellationToken);

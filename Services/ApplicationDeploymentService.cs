@@ -1,3 +1,4 @@
+using tms_template_net8.Common.Time;
 using tms_template_net8.Data.Repositories;
 using tms_template_net8.Models.DTOs.Application;
 
@@ -41,8 +42,8 @@ public sealed class ApplicationDeploymentService : IApplicationDeploymentService
         var entity = ToEntity(request);
         var created = await _repository.AddAsync(entity, cancellationToken);
 
-        // Keep the application row in sync with the latest deployment.
-        var lastDeployment = TryParseTimestamp(entity.Timestamp) ?? DateTime.UtcNow;
+        // Keep the application row in sync with the latest deployment (version/commit/last_deployment).
+        var lastDeployment = TryParseTimestamp(entity.Timestamp) ?? MalaysiaTime.Now;
         var updated = await _applicationRepository.UpdateCurrentDeploymentAsync(
             application.Id,
             entity.Version,
@@ -77,9 +78,7 @@ public sealed class ApplicationDeploymentService : IApplicationDeploymentService
         ApplicationId = request.ApplicationId,
         CommitNo = (request.CommitNo ?? string.Empty).Trim(),
         Version = (request.Version ?? string.Empty).Trim(),
-        Timestamp = string.IsNullOrWhiteSpace(request.Timestamp)
-            ? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
-            : request.Timestamp.Trim()
+        Timestamp = MalaysiaTime.ForStorageString(request.Timestamp)
     };
 
     private static DateTime? TryParseTimestamp(string timestamp)

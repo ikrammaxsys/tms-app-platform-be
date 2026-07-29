@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using tms_template_net8.Auth.Models;
-using tms_template_net8.Auth.Security;
 using tms_template_net8.Models.DTOs;
 using tms_template_net8.Models.DTOs.Product;
 using tms_template_net8.Services;
@@ -28,9 +26,8 @@ public class ProductsController : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<ProductItem>>.SuccessResponse(items, "Products fetched successfully."));
     }
 
-    // Preserves the controller-level 'view' access requirement from the former Web endpoint.
+    // Preserves the former Web list shape for clients that still call this route.
     [HttpGet("list")]
-    [RequirePageAccess("PAB Sites", AccessRight.View)]
     public IActionResult GetList()
     {
         var rows = _productService.GetAll()

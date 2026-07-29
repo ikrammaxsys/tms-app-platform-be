@@ -4,6 +4,8 @@ public interface IApplicationRepository
 {
     Task<IReadOnlyList<ApplicationItem>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<ApplicationItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<ApplicationItem?> GetByUidAsync(string uid, CancellationToken cancellationToken = default);
+    Task<bool> UidExistsAsync(string uid, int? excludeId = null, CancellationToken cancellationToken = default);
     Task<ApplicationItem> AddAsync(ApplicationItem application, CancellationToken cancellationToken = default);
     Task<bool> UpdateAsync(int id, ApplicationItem application, CancellationToken cancellationToken = default);
     Task<bool> UpdateCurrentDeploymentAsync(int id, string version, string commit, DateTime? lastDeployment, CancellationToken cancellationToken = default);

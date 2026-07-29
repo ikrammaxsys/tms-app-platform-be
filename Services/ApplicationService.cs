@@ -1,3 +1,4 @@
+using tms_template_net8.Common.Time;
 using tms_template_net8.Data.Repositories;
 using tms_template_net8.Models.DTOs.Application;
 namespace tms_template_net8.Services;
@@ -29,7 +30,12 @@ public sealed class ApplicationService : IApplicationService
             return null;
         if (await _groupRepository.GetByIdAsync(request.ApplicationGroupId, cancellationToken) is null)
             return null;
-        return await _repository.AddAsync(ToEntity(request), cancellationToken);
+
+        var entity = ToEntity(request);
+        if (await _repository.UidExistsAsync(entity.Uid, null, cancellationToken))
+            throw new InvalidOperationException($"Application uid '{entity.Uid}' already exists.");
+
+        return await _repository.AddAsync(entity, cancellationToken);
     }
 
     public async Task<bool> UpdateAsync(int id, ApplicationUpsertRequest request, CancellationToken cancellationToken = default)
@@ -38,22 +44,37 @@ public sealed class ApplicationService : IApplicationService
             return false;
         if (await _groupRepository.GetByIdAsync(request.ApplicationGroupId, cancellationToken) is null)
             return false;
-        return await _repository.UpdateAsync(id, ToEntity(request), cancellationToken);
+
+        var entity = ToEntity(request);
+        if (await _repository.UidExistsAsync(entity.Uid, id, cancellationToken))
+            throw new InvalidOperationException($"Application uid '{entity.Uid}' already exists.");
+
+        return await _repository.UpdateAsync(id, entity, cancellationToken);
     }
 
     public Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default) =>
         _repository.DeleteAsync(id, cancellationToken);
         
-    private static ApplicationItem ToEntity(ApplicationUpsertRequest request) => new()
+    private static ApplicationItem ToEntity(ApplicationUpsertRequest request)
     {
-        Name = (request.Name ?? string.Empty).Trim(),
-        Version = (request.Version ?? string.Empty).Trim(),
-        Commit = (request.Commit ?? string.Empty).Trim(),
-        Status = string.IsNullOrWhiteSpace(request.Status) ? "Healthy" : request.Status.Trim(),
-        LastDeployment = request.LastDeployment,
-        AppUrl = (request.AppUrl ?? string.Empty).Trim(),
-        RepositoryUrl = (request.RepositoryUrl ?? string.Empty).Trim(),
-        ServerId = request.ServerId,
-        ApplicationGroupId = request.ApplicationGroupId
-    };
+        var uid = (request.Uid ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(uid))
+            uid = Guid.NewGuid().ToString("N");
+
+        return new ApplicationItem
+        {
+            Uid = uid,
+            Name = (request.Name ?? string.Empty).Trim(),
+            Version = (request.Version ?? string.Empty).Trim(),
+            Commit = (request.Commit ?? string.Empty).Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status) ? "Healthy" : request.Status.Trim(),
+            LastDeployment = request.LastDeployment.HasValue
+                ? MalaysiaTime.ForStorage(request.LastDeployment)
+                : null,
+            AppUrl = (request.AppUrl ?? string.Empty).Trim(),
+            RepositoryUrl = (request.RepositoryUrl ?? string.Empty).Trim(),
+            ServerId = request.ServerId,
+            ApplicationGroupId = request.ApplicationGroupId
+        };
+    }
 }

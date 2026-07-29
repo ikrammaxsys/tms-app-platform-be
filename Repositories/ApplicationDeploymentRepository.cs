@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
 using TMS.WebApp.Sdk.Data.Sql;
+using tms_template_net8.Common.Time;
 using tms_template_net8.Models.DTOs.Application;
 
 namespace tms_template_net8.Data.Repositories;
@@ -61,12 +62,13 @@ public sealed class ApplicationDeploymentRepository : IApplicationDeploymentRepo
             VALUES
                 (@ApplicationId, @CommitNo, @Version, @Timestamp);
             """;
+        var timestamp = MalaysiaTime.ForStorageString(deployment.Timestamp);
         var inserted = await _sql.QuerySingleAsync<ApplicationDeploymentItem>(sql, CommandType.Text, new
         {
             deployment.ApplicationId,
             deployment.CommitNo,
             deployment.Version,
-            deployment.Timestamp
+            Timestamp = timestamp
         }, null, cancellationToken);
         if (inserted is null)
             throw new InvalidOperationException("Failed to insert application deployment.");
@@ -96,7 +98,7 @@ public sealed class ApplicationDeploymentRepository : IApplicationDeploymentRepo
                 new SqlParameter("@ApplicationId", deployment.ApplicationId),
                 new SqlParameter("@CommitNo", (object?)deployment.CommitNo ?? DBNull.Value),
                 new SqlParameter("@Version", (object?)deployment.Version ?? DBNull.Value),
-                new SqlParameter("@Timestamp", (object?)deployment.Timestamp ?? DBNull.Value)
+                new SqlParameter("@Timestamp", MalaysiaTime.ForStorageString(deployment.Timestamp))
             ],
             null,
             cancellationToken);

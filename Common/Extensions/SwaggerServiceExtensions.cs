@@ -1,14 +1,10 @@
 using System.Reflection;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.OpenApi.Models;
 
 namespace tms_template_net8.Common.Extensions;
 
 /// <summary>
-/// Registers OpenAPI / Swagger generation for the JSON API controllers only
-/// (those annotated with <see cref="ApiControllerAttribute"/>). The MVC/Razor
-/// view controllers are intentionally excluded from the API documentation.
+/// Registers OpenAPI / Swagger generation for the JSON API controllers.
 /// </summary>
 public static class SwaggerServiceExtensions
 {
@@ -23,13 +19,8 @@ public static class SwaggerServiceExtensions
             {
                 Title = "TMS Dev Platform API",
                 Version = "v1",
-                Description = "REST API for the TMS Dev Platform (applications, application groups, servers and products)."
+                Description = "REST API for the TMS Dev Platform (applications, application groups, servers, products, and uptime)."
             });
-
-            // Only surface endpoints whose controller is an [ApiController].
-            options.DocInclusionPredicate((_, apiDescription) =>
-                apiDescription.ActionDescriptor is ControllerActionDescriptor descriptor &&
-                descriptor.ControllerTypeInfo.GetCustomAttribute<ApiControllerAttribute>() is not null);
 
             // Include XML summary comments when the documentation file is present.
             var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
