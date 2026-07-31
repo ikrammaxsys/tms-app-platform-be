@@ -1,6 +1,7 @@
 using tms_template_net8.Common.Time;
 using tms_template_net8.Data.Repositories;
 using tms_template_net8.Models.DTOs.Application;
+using tms_template_net8.Models.DTOs.Server;
 using tms_template_net8.Models.DTOs.Uptime;
 
 namespace tms_template_net8.Services;
@@ -12,15 +13,21 @@ public sealed class UptimeService : IUptimeService
     private readonly IApplicationRepository _applicationRepository;
     private readonly IApplicationDeploymentService _deploymentService;
     private readonly IApplicationUptimeLogRepository _uptimeLogs;
+    private readonly IServerRepository _servers;
+    private readonly IServerMetricsRepository _serverMetrics;
 
     public UptimeService(
         IApplicationRepository applicationRepository,
         IApplicationDeploymentService deploymentService,
-        IApplicationUptimeLogRepository uptimeLogs)
+        IApplicationUptimeLogRepository uptimeLogs,
+        IServerRepository servers,
+        IServerMetricsRepository serverMetrics)
     {
         _applicationRepository = applicationRepository;
         _deploymentService = deploymentService;
         _uptimeLogs = uptimeLogs;
+        _servers = servers;
+        _serverMetrics = serverMetrics;
     }
 
     public async Task<AgentUptimeReportResult?> ReportAsync(
@@ -80,6 +87,50 @@ public sealed class UptimeService : IUptimeService
         };
     }
 
+    public async Task<AgentHostReportResult?> ReportHostAsync(
+        AgentHostReportRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var hostId = (request.HostId ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(hostId))
+            return null;
+
+        var server = await _servers.GetByIpAddressAsync(hostId, cancellationToken);
+        if (server is null)
+            return null;
+
+        var disks = request.Disks ?? [];
+        var diskTotal = disks.Sum(d => d.TotalBytes ?? 0);
+        var diskUsed = disks.Sum(d => d.UsedBytes ?? 0);
+        var diskAvailable = disks.Sum(d => d.FreeBytes ?? 0);
+
+        var timestamp = request.CollectedAt.HasValue
+            ? MalaysiaTime.ForStorage(request.CollectedAt)
+            : MalaysiaTime.Now;
+
+        var metrics = await _serverMetrics.AddAsync(new ServerMetricsItem
+        {
+            ServerId = server.Id,
+            CpuCores = request.CpuCores ?? 0,
+            CpuUsage = RoundUsage(request.CpuUsagePercent ?? 0),
+            RamTotal = request.MemoryTotalBytes ?? 0,
+            RamUsage = request.MemoryUsedBytes ?? 0,
+            RamAvailable = request.MemoryFreeBytes ?? 0,
+            DiskTotal = diskTotal,
+            DiskUsed = diskUsed,
+            DiskAvailable = diskAvailable,
+            Timestamp = timestamp
+        }, cancellationToken);
+
+        return new AgentHostReportResult
+        {
+            ServerId = server.Id,
+            HostId = hostId,
+            ServerMetricsId = metrics.Id,
+            Timestamp = metrics.Timestamp
+        };
+    }
+
     public async Task<UptimeTimelineResponse?> GetTimelineAsync(
         int applicationId,
         int days,
@@ -127,6 +178,204 @@ public sealed class UptimeService : IUptimeService
             Points = points
         };
     }
+
+    public async Task<HostMetricsTimelineResponse?> GetHostMetricsTimelineAsync(
+        int serverId,
+        int days,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AllowedTimelineDays.Contains(days))
+            throw new ArgumentOutOfRangeException(nameof(days), "days must be 1, 7, or 30.");
+
+        var server = await _servers.GetByIdAsync(serverId, cancellationToken);
+        if (server is null)
+            return null;
+
+        var to = MalaysiaTime.Now;
+        var from = days == 1
+            ? to.Date
+            : to.Date.AddDays(-(days - 1));
+
+        var metrics = await _serverMetrics.GetByServerIdSinceAsync(serverId, from, cancellationToken);
+        var latest = await _serverMetrics.GetLatestByServerIdAsync(serverId, cancellationToken);
+        var points = days == 1
+            ? BuildHostHourlyPoints(from, metrics)
+            : BuildHostDailyPoints(from, days, metrics);
+
+        var upCount = metrics.Count(IsHostUp);
+        var degradedCount = metrics.Count(IsHostDegraded);
+        var downCount = metrics.Count(IsHostDown);
+        var total = metrics.Count;
+        var isOnline = latest is not null && IsHostUp(latest);
+
+        return new HostMetricsTimelineResponse
+        {
+            ServerId = serverId,
+            IsOnline = isOnline,
+            CurrentStatus = latest is null ? "NoData" : MapHostStatus(latest),
+            LastChecked = latest?.Timestamp,
+            CurrentCpuUsage = latest?.CpuUsage,
+            CurrentRam = latest is null ? null : ToRamMetrics(latest),
+            CurrentDisk = latest is null ? null : ToDiskMetrics(latest),
+            Days = days,
+            Granularity = days == 1 ? "hour" : "day",
+            From = from,
+            To = to,
+            UptimePercent = RoundPercent(total == 0 ? 100.0 : 100.0 * upCount / total),
+            TotalChecks = total,
+            UpCount = upCount,
+            DegradedCount = degradedCount,
+            DownCount = downCount,
+            Points = points
+        };
+    }
+
+    private static List<HostMetricsTimelinePoint> BuildHostHourlyPoints(
+        DateTime from,
+        IReadOnlyList<ServerMetricsItem> metrics)
+    {
+        var byHour = metrics
+            .GroupBy(m => new DateTime(m.Timestamp.Year, m.Timestamp.Month, m.Timestamp.Day, m.Timestamp.Hour, 0, 0))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var points = new List<HostMetricsTimelinePoint>(24);
+        var endExclusive = from.AddDays(1);
+        for (var hour = from; hour < endExclusive; hour = hour.AddHours(1))
+        {
+            byHour.TryGetValue(hour, out var hourMetrics);
+            points.Add(ToHostPoint(
+                label: hour.ToString("HH:00"),
+                from: hour,
+                to: hour.AddHours(1),
+                metrics: hourMetrics));
+        }
+
+        return points;
+    }
+
+    private static List<HostMetricsTimelinePoint> BuildHostDailyPoints(
+        DateTime from,
+        int days,
+        IReadOnlyList<ServerMetricsItem> metrics)
+    {
+        var byDay = metrics
+            .GroupBy(m => m.Timestamp.Date)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var points = new List<HostMetricsTimelinePoint>(days);
+        for (var i = 0; i < days; i++)
+        {
+            var day = from.Date.AddDays(i);
+            byDay.TryGetValue(day, out var dayMetrics);
+            points.Add(ToHostPoint(
+                label: day.ToString("MMM d"),
+                from: day,
+                to: day.AddDays(1),
+                metrics: dayMetrics));
+        }
+
+        return points;
+    }
+
+    private static HostMetricsTimelinePoint ToHostPoint(
+        string label,
+        DateTime from,
+        DateTime to,
+        List<ServerMetricsItem>? metrics)
+    {
+        if (metrics is null || metrics.Count == 0)
+        {
+            return new HostMetricsTimelinePoint
+            {
+                Label = label,
+                From = from,
+                To = to,
+                UptimePercent = null,
+                Status = "NoData",
+                TotalChecks = 0
+            };
+        }
+
+        var upCount = metrics.Count(IsHostUp);
+        var degradedCount = metrics.Count(IsHostDegraded);
+        var downCount = metrics.Count(IsHostDown);
+        var status = downCount > 0 ? "Down" : degradedCount > 0 ? "Degraded" : "Up";
+
+        return new HostMetricsTimelinePoint
+        {
+            Label = label,
+            From = from,
+            To = to,
+            UptimePercent = RoundPercent(100.0 * upCount / metrics.Count),
+            Status = status,
+            TotalChecks = metrics.Count,
+            UpCount = upCount,
+            DegradedCount = degradedCount,
+            DownCount = downCount,
+            AvgCpuUsage = RoundUsage((double)metrics.Average(m => m.CpuUsage)),
+            Ram = AggregateRamMetrics(metrics),
+            Disk = AggregateDiskMetrics(metrics)
+        };
+    }
+
+    private static HostResourceMetrics ToRamMetrics(ServerMetricsItem metric) =>
+        ToResourceMetrics(metric.RamTotal, metric.RamUsage, metric.RamAvailable);
+
+    private static HostResourceMetrics ToDiskMetrics(ServerMetricsItem metric) =>
+        ToResourceMetrics(metric.DiskTotal, metric.DiskUsed, metric.DiskAvailable);
+
+    private static HostResourceMetrics AggregateRamMetrics(IReadOnlyList<ServerMetricsItem> metrics)
+    {
+        var total = (long)metrics.Average(m => m.RamTotal);
+        var used = (long)metrics.Average(m => m.RamUsage);
+        var available = (long)metrics.Average(m => m.RamAvailable);
+        return ToResourceMetrics(total, used, available);
+    }
+
+    private static HostResourceMetrics AggregateDiskMetrics(IReadOnlyList<ServerMetricsItem> metrics)
+    {
+        var total = (long)metrics.Average(m => m.DiskTotal);
+        var used = (long)metrics.Average(m => m.DiskUsed);
+        var available = (long)metrics.Average(m => m.DiskAvailable);
+        return ToResourceMetrics(total, used, available);
+    }
+
+    private static HostResourceMetrics ToResourceMetrics(long total, long used, long available) =>
+        new()
+        {
+            TotalBytes = total,
+            UsedBytes = used,
+            AvailableBytes = available,
+            UsagePercent = total > 0 ? RoundPercent(100.0 * used / total) : 0
+        };
+
+    private static bool IsHostUp(ServerMetricsItem metric) =>
+        MapHostStatus(metric).Equals("Up", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsHostDegraded(ServerMetricsItem metric) =>
+        MapHostStatus(metric).Equals("Degraded", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsHostDown(ServerMetricsItem metric) =>
+        MapHostStatus(metric).Equals("Down", StringComparison.OrdinalIgnoreCase);
+
+    private static string MapHostStatus(ServerMetricsItem metric)
+    {
+        var cpu = (double)metric.CpuUsage;
+        var ram = RamUsagePercent(metric);
+        var disk = DiskUsagePercent(metric);
+
+        if (cpu >= 90 || ram >= 95 || disk >= 95)
+            return "Down";
+        if (cpu >= 75 || ram >= 85 || disk >= 85)
+            return "Degraded";
+        return "Up";
+    }
+
+    private static double RamUsagePercent(ServerMetricsItem metric) =>
+        metric.RamTotal > 0 ? 100.0 * metric.RamUsage / metric.RamTotal : 0;
+
+    private static double DiskUsagePercent(ServerMetricsItem metric) =>
+        metric.DiskTotal > 0 ? 100.0 * metric.DiskUsed / metric.DiskTotal : 0;
 
     private static List<UptimeTimelinePoint> BuildHourlyPoints(
         DateTime from,
@@ -224,6 +473,9 @@ public sealed class UptimeService : IUptimeService
 
     private static double RoundPercent(double value) =>
         Math.Round(value, 2, MidpointRounding.AwayFromZero);
+
+    private static decimal RoundUsage(double value) =>
+        Math.Round((decimal)value, 2, MidpointRounding.AwayFromZero);
 
     private static string MapAgentStatus(int? status) =>
         status == 0 ? "Down" : "Up";

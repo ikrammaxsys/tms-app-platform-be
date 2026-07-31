@@ -44,6 +44,27 @@ public class UptimeController : ControllerBase
     }
 
     /// <summary>
+    /// Host agent metrics endpoint. Records CPU, memory, and disk usage for a registered server.
+    /// </summary>
+    [HttpPost("report-host")]
+    public async Task<IActionResult> ReportHost(
+        [FromBody] AgentHostReportRequest? body,
+        CancellationToken cancellationToken)
+    {
+        if (body is null)
+            return BadRequest(ApiResponse<AgentHostReportResult>.FailureResponse("Request body is required."));
+        if (string.IsNullOrWhiteSpace(body.HostId))
+            return BadRequest(ApiResponse<AgentHostReportResult>.FailureResponse("hostId is required."));
+
+        var result = await _uptimeService.ReportHostAsync(body, cancellationToken);
+        if (result is null)
+            return NotFound(ApiResponse<AgentHostReportResult>.FailureResponse(
+                "Server not found for the given hostId (ip_address)."));
+
+        return Ok(ApiResponse<AgentHostReportResult>.SuccessResponse(result, "Server metrics stored successfully."));
+    }
+
+    /// <summary>
     /// Aggregated uptime timeline for an application.
     /// days=1 → hourly buckets; days=7|30 → daily buckets.
     /// </summary>
@@ -68,6 +89,34 @@ public class UptimeController : ControllerBase
         catch (ArgumentOutOfRangeException ex)
         {
             return BadRequest(ApiResponse<UptimeTimelineResponse>.FailureResponse(ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Aggregated host metrics timeline for a server.
+    /// days=1 → hourly buckets; days=7|30 → daily buckets.
+    /// </summary>
+    [HttpGet("{serverId:int}/host-timeline")]
+    public async Task<IActionResult> GetHostTimeline(
+        int serverId,
+        [FromQuery] int days = 7,
+        CancellationToken cancellationToken = default)
+    {
+        if (days is not (1 or 7 or 30))
+            return BadRequest(ApiResponse<HostMetricsTimelineResponse>.FailureResponse("days must be 1, 7, or 30."));
+
+        try
+        {
+            var result = await _uptimeService.GetHostMetricsTimelineAsync(serverId, days, cancellationToken);
+            if (result is null)
+                return NotFound(ApiResponse<HostMetricsTimelineResponse>.FailureResponse("Server not found."));
+
+            return Ok(ApiResponse<HostMetricsTimelineResponse>.SuccessResponse(
+                result, $"Host metrics timeline ({days} day) fetched successfully."));
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return BadRequest(ApiResponse<HostMetricsTimelineResponse>.FailureResponse(ex.Message));
         }
     }
 }

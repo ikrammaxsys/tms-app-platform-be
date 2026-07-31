@@ -45,6 +45,24 @@ public sealed class ServerRepository : IServerRepository
         return await _sql.QuerySingleAsync<ServerItem>(sql, CommandType.Text, new { Id = id }, null, cancellationToken);
     }
 
+    public async Task<ServerItem?> GetByIpAddressAsync(string ipAddress, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                id AS Id,
+                ip_address AS IpAddress,
+                environment AS Environment,
+                internal_external AS InternalExternal,
+                country AS Country,
+                provider AS Provider,
+                domain AS Domain
+            FROM dbo.Servers
+            WHERE ip_address = @IpAddress;
+            """;
+        return await _sql.QuerySingleAsync<ServerItem>(
+            sql, CommandType.Text, new { IpAddress = ipAddress.Trim() }, null, cancellationToken);
+    }
+
     public async Task<ServerItem> AddAsync(ServerItem server, CancellationToken cancellationToken = default)
     {
         const string sql = """
