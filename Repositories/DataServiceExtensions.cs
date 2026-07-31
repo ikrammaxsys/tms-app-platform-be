@@ -31,6 +31,8 @@ public static class DataServiceExtensions
         services.AddScoped<IApplicationUptimeLogRepository, ApplicationUptimeLogRepository>();
         services.AddScoped<IServerMetricsRepository, ServerMetricsRepository>();
         services.AddScoped<IApplicationDeploymentRepository, ApplicationDeploymentRepository>();
+        services.AddScoped<IApplicationLogRepository, ApplicationLogRepository>();
+        services.AddScoped<IApplicationLogChunkRepository, ApplicationLogChunkRepository>();
         return services;
     }
 }

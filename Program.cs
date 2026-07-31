@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.AddFile(Path.Combine(builder.Environment.ContentRootPath, "Logs"));
 
 builder.Services.AddControllers();
-builder.Services.AddHttpClient();
+builder.Services.AddExternalIntegrations();
 
 builder.Services.AddDataRepositories(builder.Configuration);
 builder.Services.AddAppServices();
