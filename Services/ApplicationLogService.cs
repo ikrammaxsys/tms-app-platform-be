@@ -52,7 +52,7 @@ public sealed class ApplicationLogService : IApplicationLogService
         var gzipBytes = CompressToGzip(jsonString);
         var logDate = ApplicationLogPayloadHelper.ExtractDateOnly(date);
         var pathDate = ApplicationLogPayloadHelper.ToPathSegment(date);
-        var remoteBasePath = $"/{pathDate}/";
+        var remoteBasePath = $"/{appUid}/{pathDate}/";
 
         var applicationLog = await _applicationLogs.GetByApplicationIdAndDateAsync(appUid, logDate, cancellationToken);
         if (applicationLog is null)
@@ -70,7 +70,7 @@ public sealed class ApplicationLogService : IApplicationLogService
         var chunkName = $"logs-{chunkNumber}.gz";
 
         var uploadResult = await _remoteFileUploadClient.UploadAsync(gzipBytes, chunkName, remoteBasePath, cancellationToken);
-        var storedPath = ApplicationLogPayloadHelper.BuildStoredChunkPath(logDate, uploadResult.RemoteName);
+        var storedPath = ApplicationLogPayloadHelper.BuildStoredChunkPath(appUid, logDate, uploadResult.RemoteName);
 
         var chunk = await _applicationLogChunks.AddAsync(new ApplicationLogChunkItem
         {

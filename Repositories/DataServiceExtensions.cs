@@ -33,6 +33,7 @@ public static class DataServiceExtensions
         services.AddScoped<IApplicationDeploymentRepository, ApplicationDeploymentRepository>();
         services.AddScoped<IApplicationLogRepository, ApplicationLogRepository>();
         services.AddScoped<IApplicationLogChunkRepository, ApplicationLogChunkRepository>();
+        services.AddScoped<IAgentRepository, AgentRepository>();
         return services;
     }
 }

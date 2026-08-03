@@ -61,11 +61,12 @@ internal static class ApplicationLogPayloadHelper
         return $"{directory}/{fileName}";
     }
 
-    public static string BuildStoredChunkPath(string logDate, string remoteName)
+    public static string BuildStoredChunkPath(string applicationUid, string logDate, string remoteName)
     {
+        var appUid = applicationUid.Trim().Replace('\\', '/').Trim('/');
         var date = ExtractDateOnly(logDate).Trim('/');
         var fileName = remoteName.Trim().Replace('\\', '/').TrimStart('/');
-        return $"{date}/{fileName}";
+        return $"{appUid}/{date}/{fileName}";
     }
 
     public static string BuildRemoteDownloadPath(string storedPath, string? storagePrefix)

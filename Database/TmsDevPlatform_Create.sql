@@ -10,6 +10,7 @@ GO
 IF OBJECT_ID(N'dbo.application_uptime_logs', N'U') IS NOT NULL DROP TABLE dbo.application_uptime_logs;
 IF OBJECT_ID(N'dbo.Application_deployments', N'U') IS NOT NULL DROP TABLE dbo.Application_deployments;
 IF OBJECT_ID(N'dbo.Applications', N'U') IS NOT NULL DROP TABLE dbo.Applications;
+IF OBJECT_ID(N'dbo.Agents', N'U') IS NOT NULL DROP TABLE dbo.Agents;
 IF OBJECT_ID(N'dbo.Application_Groups', N'U') IS NOT NULL DROP TABLE dbo.Application_Groups;
 IF OBJECT_ID(N'dbo.Servers', N'U') IS NOT NULL DROP TABLE dbo.Servers;
 GO
@@ -79,6 +80,23 @@ GO
 CREATE NONCLUSTERED INDEX IX_Applications_Status
     ON dbo.Applications (status);
 GO
+/* -------------------------------------------------------------------------- */
+/*  Agents                                                                    */
+/* -------------------------------------------------------------------------- */
+CREATE TABLE dbo.agents
+(
+    id                  INT             NOT NULL IDENTITY(1,1),
+    uid                 NVARCHAR(64)    NOT NULL,
+    name                NVARCHAR(150)   NOT NULL,
+    server_id           INT             NOT NULL,
+    auth_token          NVARCHAR(128)   NOT NULL,
+    status              NVARCHAR(50)    NOT NULL,
+    last_ready_at       DATETIME2(0)    NULL,
+    created_at          DATETIME2(0)    NOT NULL,
+    config_json         NVARCHAR(MAX)   NULL
+);
+GO
+
 /* -------------------------------------------------------------------------- */
 /*  application_uptime_logs                                                   */
 /* -------------------------------------------------------------------------- */

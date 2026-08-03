@@ -62,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApplicationDeploymentService, ApplicationDeploymentService>();
         services.AddScoped<IUptimeService, UptimeService>();
         services.AddScoped<IApplicationLogService, ApplicationLogService>();
+        services.AddScoped<IAgentService, AgentService>();
         return services;
     }
 }
