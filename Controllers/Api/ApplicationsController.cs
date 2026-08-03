@@ -34,6 +34,10 @@ public class ApplicationsController : ControllerBase
                 x.Status,
                 LastDeployment = x.LastDeployment?.ToString("yyyy-MM-dd HH:mm") ?? "",
                 x.AppUrl,
+                x.HealthcheckUrl,
+                x.IsHealthcheck,
+                x.LogsPath,
+                x.IsScaningLogs,
                 x.ApplicationGroupName,
                 x.ServerDomain,
                 x.ServerEnvironment

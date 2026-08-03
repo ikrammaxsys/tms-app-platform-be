@@ -62,6 +62,10 @@ CREATE TABLE dbo.Applications
     repository_url          NVARCHAR(500)   NULL,
     id_server               INT             NOT NULL,
     id_application_group    INT             NOT NULL,
+    healthcheck_url         VARCHAR(200)    NULL,
+    is_healthcheck          INT             NOT NULL CONSTRAINT DF_Apps_IsHealthcheck DEFAULT (0),
+    logs_path               VARCHAR(200)    NULL,
+    is_scaning_logs         INT             NOT NULL CONSTRAINT DF_Apps_IsScaningLogs DEFAULT (0),
     CONSTRAINT PK_Applications PRIMARY KEY CLUSTERED (id),
     CONSTRAINT UQ_Applications_Uid UNIQUE (uid),
     CONSTRAINT FK_Applications_Server FOREIGN KEY (id_server)

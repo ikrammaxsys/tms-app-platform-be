@@ -11,4 +11,8 @@ public sealed class ApplicationUpsertRequest
     public string? RepositoryUrl { get; set; }
     public int ServerId { get; set; }
     public int ApplicationGroupId { get; set; }
+    public string? HealthcheckUrl { get; set; }
+    public int? IsHealthcheck { get; set; }
+    public string? LogsPath { get; set; }
+    public int? IsScaningLogs { get; set; }
 }

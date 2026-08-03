@@ -20,6 +20,10 @@ public sealed class ApplicationRepository : IApplicationRepository
             a.repository_url AS RepositoryUrl,
             a.id_server AS ServerId,
             a.id_application_group AS ApplicationGroupId,
+            a.healthcheck_url AS HealthcheckUrl,
+            a.is_healthcheck AS IsHealthcheck,
+            a.logs_path AS LogsPath,
+            a.is_scaning_logs AS IsScaningLogs,
             s.domain AS ServerDomain,
             s.environment AS ServerEnvironment,
             s.ip_address AS ServerIpAddress,
@@ -74,10 +78,12 @@ public sealed class ApplicationRepository : IApplicationRepository
     {
         const string sql = """
             INSERT INTO dbo.Applications
-                (uid, name, version, commit_id, status, last_deployment, app_url, repository_url, id_server, id_application_group)
+                (uid, name, version, commit_id, status, last_deployment, app_url, repository_url,
+                 id_server, id_application_group, healthcheck_url, is_healthcheck, logs_path, is_scaning_logs)
             OUTPUT INSERTED.id AS Id
             VALUES
-                (@Uid, @Name, @Version, @Commit, @Status, @LastDeployment, @AppUrl, @RepositoryUrl, @ServerId, @ApplicationGroupId);
+                (@Uid, @Name, @Version, @Commit, @Status, @LastDeployment, @AppUrl, @RepositoryUrl,
+                 @ServerId, @ApplicationGroupId, @HealthcheckUrl, @IsHealthcheck, @LogsPath, @IsScaningLogs);
             """;
         var inserted = await _sql.QuerySingleAsync<ApplicationItem>(sql, CommandType.Text, new
         {
@@ -92,7 +98,11 @@ public sealed class ApplicationRepository : IApplicationRepository
             application.AppUrl,
             application.RepositoryUrl,
             application.ServerId,
-            application.ApplicationGroupId
+            application.ApplicationGroupId,
+            HealthcheckUrl = (object?)application.HealthcheckUrl ?? DBNull.Value,
+            application.IsHealthcheck,
+            LogsPath = (object?)application.LogsPath ?? DBNull.Value,
+            application.IsScaningLogs
         }, null, cancellationToken);
         if (inserted is null)
             throw new InvalidOperationException("Failed to insert application.");
@@ -114,7 +124,11 @@ public sealed class ApplicationRepository : IApplicationRepository
                 app_url = @AppUrl,
                 repository_url = @RepositoryUrl,
                 id_server = @ServerId,
-                id_application_group = @ApplicationGroupId
+                id_application_group = @ApplicationGroupId,
+                healthcheck_url = @HealthcheckUrl,
+                is_healthcheck = @IsHealthcheck,
+                logs_path = @LogsPath,
+                is_scaning_logs = @IsScaningLogs
             WHERE id = @Id;
             """;
         var affected = await _sql.ExecuteNonQueryAsync(
@@ -133,7 +147,11 @@ public sealed class ApplicationRepository : IApplicationRepository
                 new SqlParameter("@AppUrl", (object?)application.AppUrl ?? DBNull.Value),
                 new SqlParameter("@RepositoryUrl", (object?)application.RepositoryUrl ?? DBNull.Value),
                 new SqlParameter("@ServerId", application.ServerId),
-                new SqlParameter("@ApplicationGroupId", application.ApplicationGroupId)
+                new SqlParameter("@ApplicationGroupId", application.ApplicationGroupId),
+                new SqlParameter("@HealthcheckUrl", (object?)application.HealthcheckUrl ?? DBNull.Value),
+                new SqlParameter("@IsHealthcheck", application.IsHealthcheck),
+                new SqlParameter("@LogsPath", (object?)application.LogsPath ?? DBNull.Value),
+                new SqlParameter("@IsScaningLogs", application.IsScaningLogs)
             ],
             null,
             cancellationToken);

@@ -12,6 +12,10 @@ public sealed class ApplicationItem
     public string RepositoryUrl { get; set; } = string.Empty;
     public int ServerId { get; set; }
     public int ApplicationGroupId { get; set; }
+    public string HealthcheckUrl { get; set; } = string.Empty;
+    public int IsHealthcheck { get; set; }
+    public string LogsPath { get; set; } = string.Empty;
+    public int IsScaningLogs { get; set; }
     // Joined display fields
     public string ServerDomain { get; set; } = string.Empty;
     public string ServerEnvironment { get; set; } = string.Empty;

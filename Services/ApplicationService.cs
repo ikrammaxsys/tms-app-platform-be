@@ -74,7 +74,11 @@ public sealed class ApplicationService : IApplicationService
             AppUrl = (request.AppUrl ?? string.Empty).Trim(),
             RepositoryUrl = (request.RepositoryUrl ?? string.Empty).Trim(),
             ServerId = request.ServerId,
-            ApplicationGroupId = request.ApplicationGroupId
+            ApplicationGroupId = request.ApplicationGroupId,
+            HealthcheckUrl = (request.HealthcheckUrl ?? string.Empty).Trim(),
+            IsHealthcheck = request.IsHealthcheck ?? 0,
+            LogsPath = (request.LogsPath ?? string.Empty).Trim(),
+            IsScaningLogs = request.IsScaningLogs ?? 0
         };
     }
 }
