@@ -30,7 +30,8 @@ public class ServersController : ControllerBase
                 x.Environment,
                 x.InternalExternal,
                 x.Country,
-                x.Provider
+                x.Provider,
+                x.OrganizationId
             })
             .ToList();
         return Ok(rows);

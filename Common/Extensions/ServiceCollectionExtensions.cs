@@ -56,6 +56,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAppServices(this IServiceCollection services)
     {
         services.AddSingleton<IProductService, ProductService>();
+        services.AddScoped<IOrganizationService, OrganizationService>();
         services.AddScoped<IServerService, ServerService>();
         services.AddScoped<IApplicationGroupService, ApplicationGroupService>();
         services.AddScoped<IApplicationService, ApplicationService>();

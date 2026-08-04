@@ -13,6 +13,7 @@ IF OBJECT_ID(N'dbo.Applications', N'U') IS NOT NULL DROP TABLE dbo.Applications;
 IF OBJECT_ID(N'dbo.Agents', N'U') IS NOT NULL DROP TABLE dbo.Agents;
 IF OBJECT_ID(N'dbo.Application_Groups', N'U') IS NOT NULL DROP TABLE dbo.Application_Groups;
 IF OBJECT_ID(N'dbo.Servers', N'U') IS NOT NULL DROP TABLE dbo.Servers;
+IF OBJECT_ID(N'dbo.Organizations', N'U') IS NOT NULL DROP TABLE dbo.Organizations;
 GO
 /* -------------------------------------------------------------------------- */
 /*  Application_Groups                                                        */
@@ -26,26 +27,34 @@ CREATE TABLE dbo.Application_Groups
 );
 GO
 /* -------------------------------------------------------------------------- */
+/*  Organizations                                                             */
+/* -------------------------------------------------------------------------- */
+CREATE TABLE dbo.organizations
+(
+    id                  INT             NOT NULL IDENTITY(1,1),
+    code                NVARCHAR(50)    NOT NULL,
+    name                NVARCHAR(150)   NOT NULL,
+    CONSTRAINT PK_Organizations PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT UQ_Organizations_Code UNIQUE (code),
+    CONSTRAINT UQ_Organizations_Name UNIQUE (name)
+);
+GO
+/* -------------------------------------------------------------------------- */
 /*  Servers                                                                   */
 /* -------------------------------------------------------------------------- */
 CREATE TABLE dbo.Servers
 (
     id                  INT             NOT NULL IDENTITY(1,1),
     ip_address          NVARCHAR(100)   NOT NULL,
-    environment         NVARCHAR(50)    NOT NULL CONSTRAINT DF_Servers_ENV DEFAULT (N'Live'),
-    internal_external   NVARCHAR(20)    NOT NULL CONSTRAINT DF_Servers_IE DEFAULT (N'Internal'),
+    environment         NVARCHAR(50)    NOT NULL,
+    internal_external   NVARCHAR(20)    NOT NULL,
     country             NVARCHAR(100)   NULL,
     provider            NVARCHAR(100)   NULL,
     domain              NVARCHAR(255)   NOT NULL,
-    CONSTRAINT PK_Servers PRIMARY KEY CLUSTERED (id),
-    CONSTRAINT UQ_Servers_Domain UNIQUE (domain),
-    CONSTRAINT CK_Servers_ENV CHECK (environment IN (N'Live', N'Test', N'Development')),
-    CONSTRAINT CK_Servers_IE CHECK (internal_external IN (N'Internal', N'External'))
+    organization_id     INT             NULL,
 );
 GO
-CREATE NONCLUSTERED INDEX IX_Servers_ENV
-    ON dbo.Servers (environment);
-GO
+
 /* -------------------------------------------------------------------------- */
 /*  Applications                                                              */
 /* -------------------------------------------------------------------------- */
@@ -56,34 +65,19 @@ CREATE TABLE dbo.Applications
     name                    NVARCHAR(150)   NOT NULL,
     version                 NVARCHAR(50)    NOT NULL,
     commit_id               NVARCHAR(64)    NULL,
-    status                  NVARCHAR(50)    NOT NULL CONSTRAINT DF_Apps_STATUS DEFAULT (N'Healthy'),
+    status                  NVARCHAR(50)    NOT NULL ,
     last_deployment         DATETIME2(0)    NULL,
     app_url                 NVARCHAR(500)   NULL,
     repository_url          NVARCHAR(500)   NULL,
     id_server               INT             NOT NULL,
     id_application_group    INT             NOT NULL,
     healthcheck_url         VARCHAR(200)    NULL,
-    is_healthcheck          INT             NOT NULL CONSTRAINT DF_Apps_IsHealthcheck DEFAULT (0),
+    is_healthcheck          INT             NOT NULL,
     logs_path               VARCHAR(200)    NULL,
-    is_scaning_logs         INT             NOT NULL CONSTRAINT DF_Apps_IsScaningLogs DEFAULT (0),
-    CONSTRAINT PK_Applications PRIMARY KEY CLUSTERED (id),
-    CONSTRAINT UQ_Applications_Uid UNIQUE (uid),
-    CONSTRAINT FK_Applications_Server FOREIGN KEY (id_server)
-        REFERENCES dbo.Servers (id),
-    CONSTRAINT FK_Applications_Group FOREIGN KEY (id_application_group)
-        REFERENCES dbo.Application_Groups (id),
-    CONSTRAINT CK_Apps_STATUS CHECK (status IN (N'Healthy', N'Warning', N'Down', N'Inactive'))
+    is_scaning_logs         INT             NOT NULL,
 );
 GO
-CREATE NONCLUSTERED INDEX IX_Applications_Server
-    ON dbo.Applications (id_server);
-GO
-CREATE NONCLUSTERED INDEX IX_Applications_Group
-    ON dbo.Applications (id_application_group);
-GO
-CREATE NONCLUSTERED INDEX IX_Applications_Status
-    ON dbo.Applications (status);
-GO
+
 /* -------------------------------------------------------------------------- */
 /*  Agents                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -110,16 +104,10 @@ CREATE TABLE dbo.application_uptime_logs
     id_application      INT             NOT NULL,
     latency             INT             NULL,          -- milliseconds
     status              NVARCHAR(50)    NOT NULL,
-    [timestamp]         DATETIME2(0)    NOT NULL CONSTRAINT DF_Uptime_TS DEFAULT (DATEADD(HOUR, 8, SYSUTCDATETIME())),
-    CONSTRAINT PK_application_uptime_logs PRIMARY KEY CLUSTERED (id),
-    CONSTRAINT FK_Uptime_Application FOREIGN KEY (id_application)
-        REFERENCES dbo.Applications (id),
-    CONSTRAINT CK_Uptime_STATUS CHECK (status IN (N'Up', N'Down', N'Degraded'))
+    [timestamp]         DATETIME2(0)    NOT NULL,
 );
 GO
-CREATE NONCLUSTERED INDEX IX_Uptime_App_Timestamp
-    ON dbo.application_uptime_logs (id_application, [timestamp] DESC);
-GO
+
 /* -------------------------------------------------------------------------- */
 /*  Application_deployments                                                   */
 /* -------------------------------------------------------------------------- */
@@ -130,12 +118,9 @@ CREATE TABLE dbo.Application_deployments
     commit_no           VARCHAR(100)    NULL,
     version             VARCHAR(100)    NULL,
     [timestamp]         VARCHAR(100)    NULL,
-    CONSTRAINT Application_deployments_PK PRIMARY KEY CLUSTERED (id)
 );
 GO
-CREATE NONCLUSTERED INDEX IX_Application_deployments_App
-    ON dbo.Application_deployments (application_id);
-GO
+
 /* -------------------------------------------------------------------------- */
 /*  Seed data                                                                 */
 /* -------------------------------------------------------------------------- */

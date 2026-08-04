@@ -8,4 +8,5 @@ public interface IServerRepository
     Task<ServerItem> AddAsync(ServerItem server, CancellationToken cancellationToken = default);
     Task<bool> UpdateAsync(int id, ServerItem server, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+    Task<bool> AnyByOrganizationIdAsync(int organizationId, CancellationToken cancellationToken = default);
 }

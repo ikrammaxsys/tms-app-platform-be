@@ -151,8 +151,8 @@ public sealed class UptimeService : IUptimeService
         var logs = await _uptimeLogs.GetByApplicationIdSinceAsync(applicationId, from, cancellationToken);
         var latest = await _uptimeLogs.GetLatestByApplicationIdAsync(applicationId, cancellationToken);
         var points = days == 1
-            ? BuildHourlyPoints(from, logs)
-            : BuildDailyPoints(from, days, logs);
+            ? BuildHourlyPoints(from, logs, to)
+            : BuildDailyPoints(from, days, logs, to);
 
         var upCount = logs.Count(IsUp);
         var degradedCount = logs.Count(IsDegraded);
@@ -379,7 +379,8 @@ public sealed class UptimeService : IUptimeService
 
     private static List<UptimeTimelinePoint> BuildHourlyPoints(
         DateTime from,
-        IReadOnlyList<ApplicationUptimeLogItem> logs)
+        IReadOnlyList<ApplicationUptimeLogItem> logs,
+        DateTime now)
     {
         var byHour = logs
             .GroupBy(l => new DateTime(l.Timestamp.Year, l.Timestamp.Month, l.Timestamp.Day, l.Timestamp.Hour, 0, 0))
@@ -394,7 +395,8 @@ public sealed class UptimeService : IUptimeService
                 label: hour.ToString("HH:00"),
                 from: hour,
                 to: hour.AddHours(1),
-                logs: hourLogs));
+                logs: hourLogs,
+                now));
         }
 
         return points;
@@ -403,7 +405,8 @@ public sealed class UptimeService : IUptimeService
     private static List<UptimeTimelinePoint> BuildDailyPoints(
         DateTime from,
         int days,
-        IReadOnlyList<ApplicationUptimeLogItem> logs)
+        IReadOnlyList<ApplicationUptimeLogItem> logs,
+        DateTime now)
     {
         var byDay = logs
             .GroupBy(l => l.Timestamp.Date)
@@ -418,7 +421,8 @@ public sealed class UptimeService : IUptimeService
                 label: day.ToString("MMM d"),
                 from: day,
                 to: day.AddDays(1),
-                logs: dayLogs));
+                logs: dayLogs,
+                now));
         }
 
         return points;
@@ -428,7 +432,8 @@ public sealed class UptimeService : IUptimeService
         string label,
         DateTime from,
         DateTime to,
-        List<ApplicationUptimeLogItem>? logs)
+        List<ApplicationUptimeLogItem>? logs,
+        DateTime now)
     {
         if (logs is null || logs.Count == 0)
         {
@@ -446,7 +451,7 @@ public sealed class UptimeService : IUptimeService
         var upCount = logs.Count(IsUp);
         var degradedCount = logs.Count(IsDegraded);
         var downCount = logs.Count(IsDown);
-        var status = downCount > 0 ? "Down" : degradedCount > 0 ? "Degraded" : "Up";
+        var status = ResolveBucketStatus(logs, from, to, now, upCount, degradedCount, downCount);
 
         return new UptimeTimelinePoint
         {
@@ -460,6 +465,38 @@ public sealed class UptimeService : IUptimeService
             DegradedCount = degradedCount,
             DownCount = downCount
         };
+    }
+
+    /// <summary>
+    /// In-progress buckets use the latest check (matches currentStatus).
+    /// Completed buckets summarize the full period instead of marking Down on any single failure.
+    /// </summary>
+    private static string ResolveBucketStatus(
+        IReadOnlyList<ApplicationUptimeLogItem> logs,
+        DateTime from,
+        DateTime to,
+        DateTime now,
+        int upCount,
+        int degradedCount,
+        int downCount)
+    {
+        if (now >= from && now < to)
+        {
+            var latest = logs.OrderByDescending(l => l.Timestamp).First();
+            return latest.Status;
+        }
+
+        if (downCount == logs.Count)
+            return "Down";
+        if (upCount == logs.Count)
+            return "Up";
+        if (degradedCount > 0 && downCount == 0)
+            return "Degraded";
+        if (downCount > 0 && upCount == 0)
+            return "Down";
+
+        var uptimeRatio = (double)upCount / logs.Count;
+        return uptimeRatio >= 0.95 ? "Degraded" : downCount >= upCount ? "Down" : "Degraded";
     }
 
     private static bool IsUp(ApplicationUptimeLogItem log) =>

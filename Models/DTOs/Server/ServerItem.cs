@@ -20,5 +20,7 @@ public sealed class ServerItem
 
     public string Domain { get; set; } = string.Empty;
 
+    public int? OrganizationId { get; set; }
+
 }
 

@@ -31,6 +31,7 @@ public sealed class ServerService : IServerService
         InternalExternal = string.IsNullOrWhiteSpace(request.InternalExternal) ? "Internal" : request.InternalExternal.Trim(),
         Country = (request.Country ?? string.Empty).Trim(),
         Provider = (request.Provider ?? string.Empty).Trim(),
-        Domain = (request.Domain ?? string.Empty).Trim()
+        Domain = (request.Domain ?? string.Empty).Trim(),
+        OrganizationId = request.OrganizationId is > 0 ? request.OrganizationId : null
     };
 }

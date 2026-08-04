@@ -18,5 +18,7 @@ public sealed class ServerUpsertRequest
 
     public string? Domain { get; set; }
 
+    public int? OrganizationId { get; set; }
+
 }
 

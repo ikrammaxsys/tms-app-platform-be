@@ -20,7 +20,8 @@ public sealed class ServerRepository : IServerRepository
                 internal_external AS InternalExternal,
                 country AS Country,
                 provider AS Provider,
-                domain AS Domain
+                domain AS Domain,
+                organization_id AS OrganizationId
             FROM dbo.Servers
             ORDER BY id;
             """;
@@ -38,7 +39,8 @@ public sealed class ServerRepository : IServerRepository
                 internal_external AS InternalExternal,
                 country AS Country,
                 provider AS Provider,
-                domain AS Domain
+                domain AS Domain,
+                organization_id AS OrganizationId
             FROM dbo.Servers
             WHERE id = @Id;
             """;
@@ -55,7 +57,8 @@ public sealed class ServerRepository : IServerRepository
                 internal_external AS InternalExternal,
                 country AS Country,
                 provider AS Provider,
-                domain AS Domain
+                domain AS Domain,
+                organization_id AS OrganizationId
             FROM dbo.Servers
             WHERE ip_address = @IpAddress;
             """;
@@ -66,7 +69,7 @@ public sealed class ServerRepository : IServerRepository
     public async Task<ServerItem> AddAsync(ServerItem server, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            INSERT INTO dbo.Servers (ip_address, environment, internal_external, country, provider, domain)
+            INSERT INTO dbo.Servers (ip_address, environment, internal_external, country, provider, domain, organization_id)
             OUTPUT
                 INSERTED.id AS Id,
                 INSERTED.ip_address AS IpAddress,
@@ -74,8 +77,9 @@ public sealed class ServerRepository : IServerRepository
                 INSERTED.internal_external AS InternalExternal,
                 INSERTED.country AS Country,
                 INSERTED.provider AS Provider,
-                INSERTED.domain AS Domain
-            VALUES (@IpAddress, @Environment, @InternalExternal, @Country, @Provider, @Domain);
+                INSERTED.domain AS Domain,
+                INSERTED.organization_id AS OrganizationId
+            VALUES (@IpAddress, @Environment, @InternalExternal, @Country, @Provider, @Domain, @OrganizationId);
             """;
         var created = await _sql.QuerySingleAsync<ServerItem>(sql, CommandType.Text, new
         {
@@ -84,7 +88,8 @@ public sealed class ServerRepository : IServerRepository
             server.InternalExternal,
             server.Country,
             server.Provider,
-            server.Domain
+            server.Domain,
+            OrganizationId = (object?)server.OrganizationId ?? DBNull.Value
         }, null, cancellationToken);
         return created ?? throw new InvalidOperationException("Failed to insert server.");
     }
@@ -99,7 +104,8 @@ public sealed class ServerRepository : IServerRepository
                 internal_external = @InternalExternal,
                 country = @Country,
                 provider = @Provider,
-                domain = @Domain
+                domain = @Domain,
+                organization_id = @OrganizationId
             WHERE id = @Id;
             """;
         var affected = await _sql.ExecuteNonQueryAsync(
@@ -112,7 +118,8 @@ public sealed class ServerRepository : IServerRepository
                 new SqlParameter("@InternalExternal", server.InternalExternal),
                 new SqlParameter("@Country", (object?)server.Country ?? DBNull.Value),
                 new SqlParameter("@Provider", (object?)server.Provider ?? DBNull.Value),
-                new SqlParameter("@Domain", server.Domain)
+                new SqlParameter("@Domain", server.Domain),
+                new SqlParameter("@OrganizationId", (object?)server.OrganizationId ?? DBNull.Value)
             ],
             null,
             cancellationToken);
@@ -129,5 +136,16 @@ public sealed class ServerRepository : IServerRepository
             null,
             cancellationToken);
         return affected > 0;
+    }
+
+    public async Task<bool> AnyByOrganizationIdAsync(int organizationId, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT CAST(CASE WHEN EXISTS (
+                SELECT 1 FROM dbo.Servers WHERE organization_id = @OrganizationId
+            ) THEN 1 ELSE 0 END AS bit);
+            """;
+        return await _sql.QuerySingleAsync<bool>(
+            sql, CommandType.Text, new { OrganizationId = organizationId }, null, cancellationToken);
     }
 }

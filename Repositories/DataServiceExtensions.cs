@@ -25,6 +25,7 @@ public static class DataServiceExtensions
             services.UseRemoteAclConnectionProvider();
         // Product sample remains in-memory; platform repos use SQL via ISqlExecutor.
         services.AddSingleton<IProductRepository, ProductRepository>();
+        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<IServerRepository, ServerRepository>();
         services.AddScoped<IApplicationGroupRepository, ApplicationGroupRepository>();
         services.AddScoped<IApplicationRepository, ApplicationRepository>();
