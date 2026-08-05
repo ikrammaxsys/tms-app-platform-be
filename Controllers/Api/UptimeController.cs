@@ -66,25 +66,48 @@ public class UptimeController : ControllerBase
 
     /// <summary>
     /// Aggregated uptime timeline for an application.
-    /// days=1 → hourly buckets; days=7|30 → daily buckets.
+    /// Use days=1|7|30, or pass startDate/endDate (max 6 months, yyyy-MM-dd).
+    /// Single-day ranges use hourly buckets; longer ranges use daily buckets.
     /// </summary>
     [HttpGet("{applicationId:int}/timeline")]
     public async Task<IActionResult> GetTimeline(
         int applicationId,
-        [FromQuery] int days = 7,
+        [FromQuery] int? days,
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate,
         CancellationToken cancellationToken = default)
     {
-        if (days is not (1 or 7 or 30))
-            return BadRequest(ApiResponse<UptimeTimelineResponse>.FailureResponse("days must be 1, 7, or 30."));
-
         try
         {
-            var result = await _uptimeService.GetTimelineAsync(applicationId, days, cancellationToken);
+            UptimeTimelineResponse? result;
+            string message;
+
+            if (startDate.HasValue || endDate.HasValue)
+            {
+                if (!startDate.HasValue || !endDate.HasValue)
+                {
+                    return BadRequest(ApiResponse<UptimeTimelineResponse>.FailureResponse(
+                        "Both startDate and endDate are required when using a custom date range."));
+                }
+
+                result = await _uptimeService.GetTimelineByDateRangeAsync(
+                    applicationId, startDate.Value, endDate.Value, cancellationToken);
+                message = $"Uptime timeline ({startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}) fetched successfully.";
+            }
+            else
+            {
+                var timelineDays = days ?? 7;
+                if (timelineDays is not (1 or 7 or 30))
+                    return BadRequest(ApiResponse<UptimeTimelineResponse>.FailureResponse("days must be 1, 7, or 30."));
+
+                result = await _uptimeService.GetTimelineAsync(applicationId, timelineDays, cancellationToken);
+                message = $"Uptime timeline ({timelineDays} day) fetched successfully.";
+            }
+
             if (result is null)
                 return NotFound(ApiResponse<UptimeTimelineResponse>.FailureResponse("Application not found."));
 
-            return Ok(ApiResponse<UptimeTimelineResponse>.SuccessResponse(
-                result, $"Uptime timeline ({days} day) fetched successfully."));
+            return Ok(ApiResponse<UptimeTimelineResponse>.SuccessResponse(result, message));
         }
         catch (ArgumentOutOfRangeException ex)
         {

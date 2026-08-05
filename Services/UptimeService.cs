@@ -9,6 +9,7 @@ namespace tms_template_net8.Services;
 public sealed class UptimeService : IUptimeService
 {
     private static readonly HashSet<int> AllowedTimelineDays = [1, 7, 30];
+    private const int MaxTimelineMonths = 6;
 
     private readonly IApplicationRepository _applicationRepository;
     private readonly IApplicationDeploymentService _deploymentService;
@@ -139,20 +140,65 @@ public sealed class UptimeService : IUptimeService
         if (!AllowedTimelineDays.Contains(days))
             throw new ArgumentOutOfRangeException(nameof(days), "days must be 1, 7, or 30.");
 
-        var application = await _applicationRepository.GetByIdAsync(applicationId, cancellationToken);
-        if (application is null)
-            return null;
-
         var to = MalaysiaTime.Now;
         var from = days == 1
             ? to.Date
             : to.Date.AddDays(-(days - 1));
+        var toExclusive = to.Date.AddDays(1);
 
-        var logs = await _uptimeLogs.GetByApplicationIdSinceAsync(applicationId, from, cancellationToken);
+        return await BuildApplicationTimelineAsync(
+            applicationId,
+            from,
+            to,
+            toExclusive,
+            days,
+            days == 1 ? "hour" : "day",
+            cancellationToken);
+    }
+
+    public async Task<UptimeTimelineResponse?> GetTimelineByDateRangeAsync(
+        int applicationId,
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        var from = startDate.Date;
+        var toExclusive = endDate.Date.AddDays(1);
+        ValidateTimelineDateRange(from, toExclusive);
+
+        var now = MalaysiaTime.Now;
+        var to = endDate.Date >= now.Date ? now : endDate.Date.AddDays(1).AddTicks(-1);
+        var days = (toExclusive - from).Days;
+
+        return await BuildApplicationTimelineAsync(
+            applicationId,
+            from,
+            to,
+            toExclusive,
+            days,
+            days == 1 ? "hour" : "day",
+            cancellationToken);
+    }
+
+    private async Task<UptimeTimelineResponse?> BuildApplicationTimelineAsync(
+        int applicationId,
+        DateTime from,
+        DateTime to,
+        DateTime toExclusive,
+        int days,
+        string granularity,
+        CancellationToken cancellationToken)
+    {
+        var application = await _applicationRepository.GetByIdAsync(applicationId, cancellationToken);
+        if (application is null)
+            return null;
+
+        var logs = await _uptimeLogs.GetByApplicationIdBetweenAsync(applicationId, from, toExclusive, cancellationToken);
         var latest = await _uptimeLogs.GetLatestByApplicationIdAsync(applicationId, cancellationToken);
-        var points = days == 1
-            ? BuildHourlyPoints(from, logs, to)
-            : BuildDailyPoints(from, days, logs, to);
+        var now = MalaysiaTime.Now;
+        var points = granularity == "hour"
+            ? BuildHourlyPoints(from, logs, now)
+            : BuildDailyPoints(from, days, logs, now);
 
         var upCount = logs.Count(IsUp);
         var degradedCount = logs.Count(IsDegraded);
@@ -167,7 +213,7 @@ public sealed class UptimeService : IUptimeService
             CurrentStatus = latest?.Status ?? "NoData",
             LastChecked = latest?.Timestamp,
             Days = days,
-            Granularity = days == 1 ? "hour" : "day",
+            Granularity = granularity,
             From = from,
             To = to,
             UptimePercent = RoundPercent(total == 0 ? 100.0 : 100.0 * upCount / total),
@@ -177,6 +223,21 @@ public sealed class UptimeService : IUptimeService
             DownCount = downCount,
             Points = points
         };
+    }
+
+    private static void ValidateTimelineDateRange(DateTime from, DateTime toExclusive)
+    {
+        if (from >= toExclusive)
+            throw new ArgumentOutOfRangeException(nameof(from), "startDate must be before or equal to endDate.");
+
+        if (from.AddMonths(MaxTimelineMonths) < toExclusive)
+            throw new ArgumentOutOfRangeException(
+                nameof(toExclusive),
+                $"Date range cannot exceed {MaxTimelineMonths} months.");
+
+        var today = MalaysiaTime.Now.Date;
+        if (toExclusive.AddDays(-1) > today)
+            throw new ArgumentOutOfRangeException(nameof(toExclusive), "endDate cannot be in the future.");
     }
 
     public async Task<HostMetricsTimelineResponse?> GetHostMetricsTimelineAsync(

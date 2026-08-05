@@ -52,6 +52,34 @@ public sealed class ApplicationUptimeLogRepository : IApplicationUptimeLogReposi
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<ApplicationUptimeLogItem>> GetByApplicationIdBetweenAsync(
+        int applicationId,
+        DateTime from,
+        DateTime toExclusive,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                id AS Id,
+                id_application AS ApplicationId,
+                latency AS Latency,
+                status AS Status,
+                [timestamp] AS Timestamp
+            FROM dbo.application_uptime_logs
+            WHERE id_application = @ApplicationId
+              AND [timestamp] >= @From
+              AND [timestamp] < @ToExclusive
+            ORDER BY [timestamp];
+            """;
+        var rows = await _sql.QueryAsync<ApplicationUptimeLogItem>(
+            sql,
+            CommandType.Text,
+            new { ApplicationId = applicationId, From = from, ToExclusive = toExclusive },
+            null,
+            cancellationToken);
+        return rows.ToList();
+    }
+
     public async Task<ApplicationUptimeLogItem?> GetLatestByApplicationIdAsync(
         int applicationId,
         CancellationToken cancellationToken = default)
