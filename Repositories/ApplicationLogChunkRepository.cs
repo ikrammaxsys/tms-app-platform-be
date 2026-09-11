@@ -36,16 +36,19 @@ public sealed class ApplicationLogChunkRepository : IApplicationLogChunkReposito
     {
         const string sql = """
             INSERT INTO dbo.application_log_chunks
-                (application_log_id, size, name, path, remote_name)
+                (application_log_id, size, name, path, remote_name, time_start, time_end, entry_count)
             OUTPUT
                 INSERTED.id AS Id,
                 INSERTED.application_log_id AS ApplicationLogId,
                 INSERTED.size AS Size,
                 INSERTED.name AS Name,
                 INSERTED.path AS Path,
-                INSERTED.remote_name AS RemoteName
+                INSERTED.remote_name AS RemoteName,
+                INSERTED.time_start AS TimeStart,
+                INSERTED.time_end AS TimeEnd,
+                INSERTED.entry_count AS EntryCount
             VALUES
-                (@ApplicationLogId, @Size, @Name, @Path, @RemoteName);
+                (@ApplicationLogId, @Size, @Name, @Path, @RemoteName, @TimeStart, @TimeEnd, @EntryCount);
             """;
         var inserted = await _sql.QuerySingleAsync<ApplicationLogChunkItem>(
             sql,
@@ -56,7 +59,10 @@ public sealed class ApplicationLogChunkRepository : IApplicationLogChunkReposito
                 chunk.Size,
                 chunk.Name,
                 chunk.Path,
-                chunk.RemoteName
+                chunk.RemoteName,
+                chunk.TimeStart,
+                chunk.TimeEnd,
+                chunk.EntryCount
             },
             null,
             cancellationToken);
@@ -76,7 +82,10 @@ public sealed class ApplicationLogChunkRepository : IApplicationLogChunkReposito
                 size AS Size,
                 name AS Name,
                 path AS Path,
-                remote_name AS RemoteName
+                remote_name AS RemoteName,
+                time_start AS TimeStart,
+                time_end AS TimeEnd,
+                entry_count AS EntryCount
             FROM dbo.application_log_chunks
             WHERE application_log_id = @ApplicationLogId
             ORDER BY id;
@@ -85,6 +94,40 @@ public sealed class ApplicationLogChunkRepository : IApplicationLogChunkReposito
             sql,
             CommandType.Text,
             new { ApplicationLogId = applicationLogId },
+            null,
+            cancellationToken);
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<ApplicationLogChunkItem>> GetOverlappingChunksAsync(
+        int applicationLogId,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT
+                id AS Id,
+                application_log_id AS ApplicationLogId,
+                size AS Size,
+                name AS Name,
+                path AS Path,
+                remote_name AS RemoteName,
+                time_start AS TimeStart,
+                time_end AS TimeEnd,
+                entry_count AS EntryCount
+            FROM dbo.application_log_chunks
+            WHERE application_log_id = @ApplicationLogId
+              AND time_start IS NOT NULL
+              AND time_end IS NOT NULL
+              AND time_start <= @To
+              AND time_end >= @From
+            ORDER BY time_start, id;
+            """;
+        var rows = await _sql.QueryAsync<ApplicationLogChunkItem>(
+            sql,
+            CommandType.Text,
+            new { ApplicationLogId = applicationLogId, From = from, To = to },
             null,
             cancellationToken);
         return rows.ToList();

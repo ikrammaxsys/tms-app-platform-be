@@ -8,6 +8,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.AddFile(Path.Combine(builder.Environment.ContentRootPath, "Logs"));
 
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
 builder.Services.AddExternalIntegrations();
 
 builder.Services.AddDataRepositories(builder.Configuration);
@@ -43,6 +50,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseCors();
 
 app.MapControllers();
 app.Run();

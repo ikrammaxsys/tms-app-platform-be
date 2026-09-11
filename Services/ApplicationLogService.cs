@@ -45,10 +45,21 @@ public sealed class ApplicationLogService : IApplicationLogService
         if (string.IsNullOrWhiteSpace(date))
             throw new ArgumentException("date is required.");
 
+        if (string.IsNullOrWhiteSpace(request.TimeStart))
+            throw new ArgumentException("time_start is required.");
+        if (string.IsNullOrWhiteSpace(request.TimeEnd))
+            throw new ArgumentException("time_end is required.");
+
         if (!ApplicationLogPayloadHelper.IsValidLogJson(request.LogJson))
             throw new ArgumentException("log_json is required.");
 
+        var timeStart = ApplicationLogTimeRangeHelper.ParseRequiredDateTime(request.TimeStart, "time_start");
+        var timeEnd = ApplicationLogTimeRangeHelper.ParseRequiredDateTime(request.TimeEnd, "time_end");
+        if (timeStart > timeEnd)
+            throw new ArgumentException("time_start must be before or equal to time_end.");
+
         var jsonString = ApplicationLogPayloadHelper.NormalizeLogJson(request.LogJson!);
+        var entryCount = ApplicationLogTimeRangeHelper.CountLogEntries(jsonString);
         var gzipBytes = CompressToGzip(jsonString);
         var logDate = ApplicationLogPayloadHelper.ExtractDateOnly(date);
         var pathDate = ApplicationLogPayloadHelper.ToPathSegment(date);
@@ -78,7 +89,10 @@ public sealed class ApplicationLogService : IApplicationLogService
             Size = gzipBytes.Length.ToString(),
             Name = chunkName,
             Path = storedPath,
-            RemoteName = uploadResult.RemoteName
+            RemoteName = uploadResult.RemoteName,
+            TimeStart = timeStart,
+            TimeEnd = timeEnd,
+            EntryCount = entryCount
         }, cancellationToken);
 
         return new AgentApplicationLogResult
@@ -87,7 +101,10 @@ public sealed class ApplicationLogService : IApplicationLogService
             ChunkId = chunk.Id,
             ChunkName = chunkName,
             Path = storedPath,
-            Size = chunk.Size
+            Size = chunk.Size,
+            TimeStart = timeStart,
+            TimeEnd = timeEnd,
+            EntryCount = entryCount
         };
     }
 
@@ -127,7 +144,10 @@ public sealed class ApplicationLogService : IApplicationLogService
                     Name = c.Name,
                     Path = c.Path,
                     Size = c.Size,
-                    RemoteName = c.RemoteName
+                    RemoteName = c.RemoteName,
+                    TimeStart = c.TimeStart,
+                    TimeEnd = c.TimeEnd,
+                    EntryCount = c.EntryCount
                 }).ToList()
             });
         }
@@ -208,6 +228,9 @@ public sealed class ApplicationLogService : IApplicationLogService
         IReadOnlyList<ApplicationLogChunkItem> chunks,
         string? chunk)
     {
+        if (chunks.Count == 0)
+            return null;
+
         if (string.IsNullOrWhiteSpace(chunk))
             return chunks[0];
 

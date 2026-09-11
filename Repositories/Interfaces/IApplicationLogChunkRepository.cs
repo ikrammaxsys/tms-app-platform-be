@@ -13,4 +13,10 @@ public interface IApplicationLogChunkRepository
     Task<IReadOnlyList<ApplicationLogChunkItem>> GetByApplicationLogIdAsync(
         int applicationLogId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ApplicationLogChunkItem>> GetOverlappingChunksAsync(
+        int applicationLogId,
+        DateTime from,
+        DateTime to,
+        CancellationToken cancellationToken = default);
 }

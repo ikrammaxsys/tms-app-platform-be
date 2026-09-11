@@ -34,6 +34,10 @@ public class ApplicationLogsController : ControllerBase
             return BadRequest(ApiResponse<AgentApplicationLogResult>.FailureResponse("date is required."));
         if (!ApplicationLogPayloadHelper.IsValidLogJson(body.LogJson))
             return BadRequest(ApiResponse<AgentApplicationLogResult>.FailureResponse("log_json is required."));
+        if (string.IsNullOrWhiteSpace(body.TimeStart))
+            return BadRequest(ApiResponse<AgentApplicationLogResult>.FailureResponse("time_start is required."));
+        if (string.IsNullOrWhiteSpace(body.TimeEnd))
+            return BadRequest(ApiResponse<AgentApplicationLogResult>.FailureResponse("time_end is required."));
 
         try
         {

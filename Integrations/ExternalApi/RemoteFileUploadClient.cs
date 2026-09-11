@@ -7,6 +7,9 @@ namespace tms_template_net8.Integrations.ExternalApi;
 
 public sealed class RemoteFileUploadClient : IRemoteFileUploadClient
 {
+    private const string UploadPath = "api/v1/files/upload";
+    private const string GetPath = "api/v1/files/get";
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<RemoteFileUploadClient> _logger;
 
@@ -22,26 +25,31 @@ public sealed class RemoteFileUploadClient : IRemoteFileUploadClient
         string directoryPath,
         CancellationToken cancellationToken = default)
     {
-        var folderPath = ApplicationLogPayloadHelper.NormalizeDirectoryPath(directoryPath);
+        var folderPath = ApplicationLogPayloadHelper.NormalizeDirectoryPath(directoryPath).Trim('/');
         var intendedFilePath = ApplicationLogPayloadHelper.BuildChunkFilePath(folderPath, fileName);
 
         using var content = new MultipartFormDataContent();
         var fileContentPart = new ByteArrayContent(fileContent);
         fileContentPart.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
-        content.Add(fileContentPart, "file", fileName);
-        content.Add(new StringContent(folderPath), "path");
-        content.Add(new StringContent(fileName), "fileName");
+        content.Add(fileContentPart, "File", fileName);
+
+        if (!string.IsNullOrWhiteSpace(folderPath))
+            content.Add(CreateFormField(folderPath), "Path");
+
+        content.Add(CreateFormField("false"), "GenerateUuid");
+
+        var requestUrl = new Uri(_httpClient.BaseAddress!, UploadPath);
 
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient.PostAsync("/api/v1/files/upload", content, cancellationToken);
+            response = await _httpClient.PostAsync(UploadPath, content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Remote file upload request failed. Path={Path}", intendedFilePath);
+            _logger.LogError(ex, "Remote file upload request failed. Url={Url}, Path={Path}", requestUrl, intendedFilePath);
             throw new InvalidOperationException(
-                "Remote file upload request failed. Ensure CoreApi:BaseUrl uses https if the Core API runs on HTTPS.",
+                $"Remote file upload request failed for {requestUrl}. Ensure CoreApi:BaseUrl uses https if the Core API runs on HTTPS.",
                 ex);
         }
 
@@ -51,11 +59,13 @@ public sealed class RemoteFileUploadClient : IRemoteFileUploadClient
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 _logger.LogError(
-                    "Remote file upload failed. Status={StatusCode}, Path={Path}, Response={Response}",
+                    "Remote file upload failed. Status={StatusCode}, Url={Url}, Path={Path}, Response={Response}",
                     (int)response.StatusCode,
+                    requestUrl,
                     intendedFilePath,
                     body);
-                throw new InvalidOperationException($"Remote file upload failed with status {(int)response.StatusCode}.");
+                throw new InvalidOperationException(
+                    $"Remote file upload failed with status {(int)response.StatusCode} for {requestUrl}.{Truncate(body)}");
             }
 
             var envelope = await response.Content.ReadFromJsonAsync<CoreApiFileUploadResponse>(cancellationToken);
@@ -76,7 +86,7 @@ public sealed class RemoteFileUploadClient : IRemoteFileUploadClient
     public async Task<byte[]> DownloadAsync(string filePath, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.GetAsync(
-            $"/api/v1/files/get?fileName={Uri.EscapeDataString(filePath)}",
+            $"{GetPath}?fileName={Uri.EscapeDataString(filePath)}",
             cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -106,5 +116,23 @@ public sealed class RemoteFileUploadClient : IRemoteFileUploadClient
         }
 
         return await fileResponse.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+    private static StringContent CreateFormField(string value)
+    {
+        var part = new StringContent(value);
+        part.Headers.ContentType = null;
+        return part;
+    }
+
+    private static string Truncate(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return string.Empty;
+
+        var trimmed = body.Trim();
+        return trimmed.Length <= 500
+            ? $" {trimmed}"
+            : $" {trimmed[..500]}";
     }
 }

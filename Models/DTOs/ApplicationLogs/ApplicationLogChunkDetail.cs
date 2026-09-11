@@ -7,4 +7,7 @@ public sealed class ApplicationLogChunkDetail
     public string Path { get; set; } = string.Empty;
     public string Size { get; set; } = string.Empty;
     public string RemoteName { get; set; } = string.Empty;
+    public DateTime? TimeStart { get; set; }
+    public DateTime? TimeEnd { get; set; }
+    public int? EntryCount { get; set; }
 }

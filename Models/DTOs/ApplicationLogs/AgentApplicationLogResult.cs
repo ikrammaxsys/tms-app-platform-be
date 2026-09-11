@@ -7,4 +7,7 @@ public sealed class AgentApplicationLogResult
     public string ChunkName { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public string Size { get; set; } = string.Empty;
+    public DateTime TimeStart { get; set; }
+    public DateTime TimeEnd { get; set; }
+    public int EntryCount { get; set; }
 }

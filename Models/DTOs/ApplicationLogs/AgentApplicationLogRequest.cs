@@ -16,4 +16,12 @@ public sealed class AgentApplicationLogRequest
     [JsonPropertyName("log_json")]
     [JsonConverter(typeof(FlexibleLogJsonStringConverter))]
     public string? LogJson { get; set; }
+
+    [JsonPropertyName("time_start")]
+    [JsonConverter(typeof(FlexibleStringJsonConverter))]
+    public string? TimeStart { get; set; }
+
+    [JsonPropertyName("time_end")]
+    [JsonConverter(typeof(FlexibleStringJsonConverter))]
+    public string? TimeEnd { get; set; }
 }

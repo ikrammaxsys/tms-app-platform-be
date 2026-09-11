@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
     private static void ConfigureCoreApiHttpClient(IServiceProvider serviceProvider, HttpClient client)
     {
         var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-        var baseUrl = configuration["CoreApi:BaseUrl"]?.TrimEnd('/');
+        var baseUrl = configuration["CoreApi:BaseUrl"]?.Trim();
         if (string.IsNullOrWhiteSpace(baseUrl))
             throw new InvalidOperationException("CoreApi:BaseUrl is not configured.");
 
@@ -46,7 +46,9 @@ public static class ServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(appToken))
             throw new InvalidOperationException("CoreApi:AppToken is not configured.");
 
-        client.BaseAddress = new Uri(baseUrl);
+        // Trailing slash is required so relative paths like api/v1/files/upload
+        // keep a virtual directory, e.g. http://host/core-api/.
+        client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
         client.DefaultRequestHeaders.TryAddWithoutValidation("X-App-Token", appToken);
     }
 
