@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUptimeService, UptimeService>();
         services.AddScoped<IApplicationLogService, ApplicationLogService>();
         services.AddScoped<IAgentService, AgentService>();
+        services.AddScoped<INagiosWindowServerService, NagiosWindowServerService>();
         return services;
     }
 }

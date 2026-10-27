@@ -35,6 +35,7 @@ public static class DataServiceExtensions
         services.AddScoped<IApplicationLogRepository, ApplicationLogRepository>();
         services.AddScoped<IApplicationLogChunkRepository, ApplicationLogChunkRepository>();
         services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<INagiosWindowServerRepository, NagiosWindowServerRepository>();
         return services;
     }
 }
